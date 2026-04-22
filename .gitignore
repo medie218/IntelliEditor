@@ -1,0 +1,42 @@
+# IntelliEditor — .gitignore
+
+# Fichiers générés par la compilation
+build/
+bin/
+*.o
+*.a
+*.dll
+*.exe
+!SciLexer.dll      # Garder la DLL Scintilla si elle est dans le repo
+
+# Modèles LLM (trop gros pour Git — utiliser Git LFS si nécessaire)
+*.gguf
+*.bin
+models/
+
+# Dictionnaires (peuvent être régénérés ou téléchargés)
+data/dicts/
+
+# Configuration locale (contient des chemins machine-spécifiques)
+# Note : commiter un config.ini.example à la place
+*.ini
+!config.ini.example
+
+# IDE
+.vscode/
+.idea/
+*.vcxproj
+*.sln
+CMakeCache.txt
+CMakeFiles/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporaires
+*.tmp
+*.log
+test_manual.c
+test_*_manual.c

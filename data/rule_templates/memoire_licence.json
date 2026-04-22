@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "document_type": "Mémoire de Licence",
+    "version": "1.0",
+    "author": "Université Don Bosco de Lubumbashi",
+    "description": "Règles de rédaction officielles pour les mémoires de Licence — Promotion 2025-2026"
+  },
+  "rules": [
+    {
+      "id": "R001",
+      "category": "structure",
+      "severity": "error",
+      "description": "Le document doit contenir une section Introduction",
+      "check_type": "section_exists",
+      "parameter": "Introduction"
+    },
+    {
+      "id": "R002",
+      "category": "structure",
+      "severity": "error",
+      "description": "Le document doit contenir une section Conclusion",
+      "check_type": "section_exists",
+      "parameter": "Conclusion"
+    },
+    {
+      "id": "R003",
+      "category": "structure",
+      "severity": "warning",
+      "description": "Les sections doivent apparaître dans l'ordre attendu",
+      "check_type": "section_order",
+      "parameter": [
+        "Résumé",
+        "Introduction",
+        "Revue de littérature",
+        "Méthodologie",
+        "Résultats",
+        "Discussion",
+        "Conclusion",
+        "Bibliographie"
+      ]
+    },
+    {
+      "id": "R004",
+      "category": "style",
+      "severity": "warning",
+      "description": "Éviter l'emploi de la première personne du singulier",
+      "check_type": "regex_forbidden",
+      "parameter": "\\bje\\b|\\bj'|\\bme\\b|\\bmon\\b|\\bma\\b|\\bmes\\b",
+      "flags": "case_insensitive"
+    },
+    {
+      "id": "R005",
+      "category": "format",
+      "severity": "warning",
+      "description": "Les titres de niveau 1 doivent être entièrement en majuscules",
+      "check_type": "heading_format",
+      "parameter": { "level": 1, "case": "uppercase" }
+    },
+    {
+      "id": "R006",
+      "category": "longueur",
+      "severity": "warning",
+      "description": "L'introduction doit contenir au moins 300 mots",
+      "check_type": "word_count_min",
+      "parameter": { "section": "Introduction", "min_words": 300 }
+    },
+    {
+      "id": "R007",
+      "category": "longueur",
+      "severity": "warning",
+      "description": "Le résumé ne doit pas dépasser 250 mots",
+      "check_type": "word_count_max",
+      "parameter": { "section": "Résumé", "max_words": 250 }
+    },
+    {
+      "id": "R008",
+      "category": "structure",
+      "severity": "error",
+      "description": "Une section Bibliographie doit être présente",
+      "check_type": "section_exists",
+      "parameter": "Bibliographie"
+    },
+    {
+      "id": "R009",
+      "category": "sémantique",
+      "severity": "info",
+      "description": "La problématique de recherche doit être explicitement posée",
+      "check_type": "llm_semantic",
+      "parameter": "Le texte de la section Introduction pose-t-il explicitement une problématique ou une question de recherche ?",
+      "target_section": "Introduction"
+    }
+  ]
+}
