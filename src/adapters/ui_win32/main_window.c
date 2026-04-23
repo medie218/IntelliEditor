@@ -32,6 +32,10 @@
 #include "../../../include/editor.h"
 #include "../../../include/config.h"
 #include <commctrl.h>
+#include <stdbool.h>
+#include <windows.h>
+#include <shlobj.h> 
+#include <process.h>   
 #include <stdio.h>
 
 /* ============================================================================
@@ -47,20 +51,14 @@ static bool create_toolbar(AppContext *ctx);
  * POINT D'ENTRÉE WINDOWS
  * ============================================================================ */
 
-/**
- * @brief Point d'entrée de l'application Windows.
- *
- * Initialise tout le système et lance la boucle de messages.
- *
- * TODO [DEV-B / TODO-WINMAIN-001] :
- *   1. Initialiser les contrôles communs (InitCommonControlsEx)
- *   2. Charger la config depuis %APPDATA%\IntelliEditor\config.ini
- *   3. Créer le document éditeur (editor_create)
- *   4. Initialiser l'UI (ui_init)
- *   5. Démarrer le chargement LLM dans un thread séparé
- *   6. Lancer la boucle de messages (ui_run)
- *   7. Nettoyer (ui_cleanup, editor_destroy)
- */
+static void __cdecl llm_loader_thread(void *arg) {
+    AppContext *ctx = (AppContext *)arg;
+      AppConfig *config;
+    // Ici tu peux lancer ton initialisation LLM
+    // ex: llm_init(ctx);
+    _endthread();
+}
+
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
                    LPSTR     lpCmdLine,
@@ -79,17 +77,26 @@ int WINAPI WinMain(HINSTANCE hInstance,
     memset(&ctx, 0, sizeof(ctx));
     ctx.hinstance = hInstance;
 
-    /*
-     * TODO [DEV-B / TODO-WINMAIN-002] :
-     *   AppConfig cfg;
-     *   char config_path[MAX_PATH];
-     *   // Construire le chemin %APPDATA%\IntelliEditor\config.ini
-     *   SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, config_path);
-     *   strcat(config_path, "\\IntelliEditor\\config.ini");
-     *   config_load(&cfg, config_path);
-     */
+       AppConfig cfg;
+    char config_path[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, config_path))) {
+        strcat(config_path, "\\IntelliEditor\\config.ini");
+        if (!config_load(&cfg, config_path)) {
+            MessageBoxA(NULL,
+                        "Impossible de charger la configuration.\nConfiguration par défaut appliquée.",
+                        "IntelliEditor — Avertissement",
+                        MB_ICONWARNING | MB_OK);
+            config_init_defaults(&cfg); // fonction à prévoir pour valeurs par défaut
+        }
+    } else {
+        MessageBoxA(NULL,
+                    "Impossible de localiser le dossier APPDATA.\nConfiguration par défaut appliquée.",
+                    "IntelliEditor — Avertissement",
+                    MB_ICONWARNING | MB_OK);
+        config_init_defaults(&cfg);
+    }
+   
 
-    /* Créer le document éditeur */
     ctx.doc = editor_create();
     if (!ctx.doc) {
         MessageBoxA(NULL,
