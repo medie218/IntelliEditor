@@ -7,26 +7,21 @@
  * =============================================================================
  * Ce fichier teste :
  *   - La création/destruction des structures (RuleSet, RuleReport)
- *   - L’évaluation des règles simples
- *   - Les cas limites (NULL, RuleSet vide, etc.)
+ *   - L’évaluation des règles structurelles (sections, comptage)
  *   - Le comportement des règles LLM (toujours STATUS_PENDING)
  *   - La mise à jour des résultats LLM
  *
  * =============================================================================
  * DEV-D (Ehud) — Notes d’architecture
  * =============================================================================
- * - Ce fichier est essentiel pour garantir la stabilité du moteur de règles.
+ * - Ce fichier sert de documentation vivante pour le moteur de règles.
  * - Les tests sont organisés par catégories :
  *      1. Cycle de vie
  *      2. Évaluation
  *      3. LLM
  *      4. Utilitaires
  *
- * - Certains tests sont volontairement désactivés (TODO) :
- *      → Ils seront activés quand les checkers seront implémentés.
- *
- * - Les tests servent de documentation vivante :
- *      → Ils montrent comment utiliser RuleSet, RuleReport et rules_evaluate().
+ * - Certains tests restent TODO tant que les checkers ne sont pas complets.
  *
  * =============================================================================
  */
@@ -42,14 +37,9 @@
 #include <stdio.h>
 
 /* ============================================================================
- * HELPERS DE TEST
+ * HELPERS
  * ============================================================================ */
 
-/**
- * @brief Crée un RuleSet minimal avec une seule règle.
- *
- * Utilisé pour tester un checker isolé.
- */
 static RuleSet *create_test_ruleset_one_rule(CheckType type,
                                              const char *param) {
     RuleSet *set = ruleset_create();
@@ -80,7 +70,7 @@ static void test_ruleset_create_not_null(void **state) {
 
 static void test_ruleset_destroy_null_safe(void **state) {
     (void)state;
-    ruleset_destroy(NULL); /* Ne doit pas crasher */
+    ruleset_destroy(NULL);
 }
 
 static void test_rulereport_create_not_null(void **state) {
@@ -94,56 +84,42 @@ static void test_rulereport_create_not_null(void **state) {
 }
 
 /* ============================================================================
- * TESTS — ÉVALUATION DE RÈGLES
+ * TESTS — ÉVALUATION
  * ============================================================================ */
 
 static void test_rules_evaluate_null_text(void **state) {
     (void)state;
     RuleSet *set = ruleset_create();
-    if (!set) skip();
-
     RuleReport *report = rules_evaluate(set, NULL, 0);
     assert_null(report);
-
     ruleset_destroy(set);
 }
 
 static void test_rules_evaluate_empty_ruleset(void **state) {
     (void)state;
     RuleSet *set = ruleset_create();
-    if (!set) skip();
-
     const char *text = "Texte de test";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
-
     assert_non_null(report);
     assert_int_equal(report->result_count, 0);
-
     rulereport_destroy(report);
     ruleset_destroy(set);
 }
 
 /**
  * @brief Test : CHECK_SECTION_EXISTS → PASS quand la section est présente.
- *
- * TODO [DEV-D] : Activer après TODO-SECTION-003.
  */
 static void test_check_section_exists_found(void **state) {
     (void)state;
 
-    RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "Introduction");
-    if (!set) skip();
+    RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "INTRODUCTION");
+    const char *text = "INTRODUCTION\n\nContenu...\n";
 
-    const char *text = "INTRODUCTION\n\nCe document présente notre recherche.\n";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
     assert_int_equal(report->result_count, 1);
-
-    /* TODO : activer quand check_section_exists sera implémenté */
-    /* assert_int_equal(report->results[0].status, STATUS_PASS); */
-
-    printf("[TODO] test_check_section_exists_found: en attente de TODO-SECTION-003\n");
+    assert_int_equal(report->results[0].status, STATUS_PASS);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
@@ -151,22 +127,17 @@ static void test_check_section_exists_found(void **state) {
 
 /**
  * @brief Test : CHECK_SECTION_EXISTS → FAIL quand la section est absente.
- *
- * TODO [DEV-D] : Activer après TODO-SECTION-003.
  */
 static void test_check_section_exists_not_found(void **state) {
     (void)state;
 
     RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "Conclusion");
-    if (!set) skip();
+    const char *text = "INTRODUCTION\n\nContenu...\n";
 
-    const char *text = "INTRODUCTION\n\nVoici le début du document.";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
-    /* assert_int_equal(report->results[0].status, STATUS_FAIL); */
-
-    printf("[TODO] test_check_section_exists_not_found: en attente de TODO-SECTION-003\n");
+    assert_int_equal(report->results[0].status, STATUS_FAIL);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
@@ -183,9 +154,8 @@ static void test_check_llm_semantic_always_pending(void **state) {
         CHECK_LLM_SEMANTIC,
         "La problématique est-elle posée ?"
     );
-    if (!set) skip();
 
-    const char *text = "Une recherche sur l'impact de l'IA sur la société.";
+    const char *text = "Une recherche sur l'impact de l'IA.";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
@@ -205,13 +175,11 @@ static void test_rules_update_llm_result_valid(void **state) {
     (void)state;
 
     RuleSet *set = create_test_ruleset_one_rule(CHECK_LLM_SEMANTIC, "Question?");
-    if (!set) skip();
-
     const char *text = "Texte de test.";
-    RuleReport *report = rules_evaluate(set, text, strlen(text));
-    if (!report) { ruleset_destroy(set); skip(); }
 
-    rules_update_llm_result(report, "T001", STATUS_PASS, "Problématique bien posée.");
+    RuleReport *report = rules_evaluate(set, text, strlen(text));
+
+    rules_update_llm_result(report, "T001", STATUS_PASS, "OK");
 
     assert_int_equal(report->results[0].status, STATUS_PASS);
     assert_int_equal(report->pending_count, 0);
@@ -225,10 +193,7 @@ static void test_rules_update_llm_result_unknown_id(void **state) {
     (void)state;
 
     RuleReport *report = rulereport_create();
-    if (!report) skip();
-
     rules_update_llm_result(report, "INEXISTANT", STATUS_PASS, NULL);
-
     rulereport_destroy(report);
 }
 
@@ -254,7 +219,7 @@ static void test_rule_status_to_string_all(void **state) {
 }
 
 /* ============================================================================
- * CONFIGURATION DES TESTS
+ * MAIN
  * ============================================================================ */
 
 int main(void) {
