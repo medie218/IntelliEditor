@@ -3,24 +3,31 @@
  * @brief Tests unitaires du module éditeur (gap buffer, undo/redo) — cmocka
  *
  * =============================================================================
- * PHILOSOPHIE DES TESTS
+ * RÔLE
  * =============================================================================
- * Ces tests servent de GUIDE autant que de vérification.
- * Ils documentent le COMPORTEMENT ATTENDU de chaque fonction.
- *
- * Comment lire ce fichier :
- *   - Chaque fonction test_xxx() décrit un comportement précis.
- *   - Les commentaires TODO indiquent ce qui échoue encore.
- *   - Quand une fonction est implémentée, son test doit passer.
- *
- * Lancer les tests :
- *   make test
- *
- * Framework : cmocka (https://cmocka.org/)
- * Installation MSYS2 : pacman -S mingw-w64-x86_64-cmocka
+ * Ce fichier teste :
+ *   - La création/destruction du document
+ *   - L’insertion et suppression de texte
+ *   - Le fonctionnement du gap buffer
+ *   - Le système undo/redo
+ *   - Les statistiques (word count, line count)
  *
  * =============================================================================
- * RESPONSABLE : DEV-D (tous les tests), avec chaque dev pour son module
+ * DEV-D (Ehud) — Notes d’architecture
+ * =============================================================================
+ * - Ce fichier sert de GUIDE pour DEV-A.
+ * - Les tests décrivent le comportement attendu du module éditeur.
+ * - Certains tests échoueront tant que DEV-A n’aura pas implémenté les TODO.
+ * - Les tests sont organisés par catégories :
+ *      1. Cycle de vie
+ *      2. Insertion
+ *      3. Suppression
+ *      4. Undo/Redo
+ *      5. Statistiques
+ *
+ * - Les tests sont progressifs :
+ *      → DEV-A active les tests au fur et à mesure de l’implémentation.
+ *
  * =============================================================================
  */
 
@@ -29,11 +36,10 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../include/editor.h"
+#include "../../../include/editor.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
 
 /* ============================================================================
  * TESTS — CYCLE DE VIE
@@ -49,7 +55,6 @@ static void test_editor_create_not_null(void **state) {
 
     EditorDocument *doc = editor_create();
 
-    /* Si ce test échoue : editor_create() n'alloue pas correctement la mémoire */
     assert_non_null(doc);
 
     editor_destroy(doc);
@@ -61,7 +66,7 @@ static void test_editor_create_not_null(void **state) {
 static void test_editor_create_empty(void **state) {
     (void)state;
     EditorDocument *doc = editor_create();
-    if (!doc) skip(); /* Skip si editor_create() n'est pas encore implémenté */
+    if (!doc) skip();
 
     assert_int_equal(editor_get_length(doc), 0);
     assert_false(doc->dirty);
@@ -75,11 +80,8 @@ static void test_editor_create_empty(void **state) {
  */
 static void test_editor_destroy_null_safe(void **state) {
     (void)state;
-    /* Cette ligne ne doit pas provoquer de segfault */
     editor_destroy(NULL);
-    /* Si on arrive ici, le test passe */
 }
-
 
 /* ============================================================================
  * TESTS — INSERTION DE TEXTE
@@ -118,7 +120,7 @@ static void test_editor_insert_text_retrievable(void **state) {
     char *text = editor_get_text(doc);
     if (!text) {
         editor_destroy(doc);
-        skip(); /* editor_get_text pas encore implémenté */
+        skip();
     }
 
     assert_string_equal(text, "Hello");
@@ -160,7 +162,6 @@ static void test_editor_insert_sets_dirty(void **state) {
     editor_destroy(doc);
 }
 
-
 /* ============================================================================
  * TESTS — SUPPRESSION DE TEXTE
  * ============================================================================ */
@@ -176,7 +177,7 @@ static void test_editor_delete_reduces_length(void **state) {
     if (!doc) skip();
 
     editor_insert(doc, "Bonjour", 7);
-    bool ok = editor_delete(doc, 0, 3); /* Supprimer "Bon" */
+    bool ok = editor_delete(doc, 0, 3);
 
     assert_true(ok);
     assert_int_equal(editor_get_length(doc), 4);
@@ -199,13 +200,12 @@ static void test_editor_delete_out_of_bounds(void **state) {
     if (!doc) skip();
 
     editor_insert(doc, "Hi", 2);
-    bool ok = editor_delete(doc, 0, 100); /* Trop grand */
+    bool ok = editor_delete(doc, 0, 100);
 
     assert_false(ok);
 
     editor_destroy(doc);
 }
-
 
 /* ============================================================================
  * TESTS — UNDO / REDO
@@ -267,10 +267,7 @@ static void test_editor_undo_empty_stack(void **state) {
 }
 
 /**
- * @brief Test : redo vide pile après nouvelle insertion.
- *
- * Comportement attendu : après un undo puis une nouvelle insertion,
- * la pile redo doit être vidée.
+ * @brief Test : redo vidé après nouvelle insertion.
  */
 static void test_editor_redo_cleared_after_new_insert(void **state) {
     (void)state;
@@ -281,12 +278,11 @@ static void test_editor_redo_cleared_after_new_insert(void **state) {
     editor_undo(doc);
     assert_true(editor_can_redo(doc));
 
-    editor_insert(doc, "B", 1); /* Nouvelle action → vide redo */
+    editor_insert(doc, "B", 1);
     assert_false(editor_can_redo(doc));
 
     editor_destroy(doc);
 }
-
 
 /* ============================================================================
  * TESTS — STATISTIQUES
@@ -313,9 +309,8 @@ static void test_editor_stats_basic(void **state) {
     editor_destroy(doc);
 }
 
-
 /* ============================================================================
- * CONFIGURATION ET LANCEMENT DES TESTS
+ * CONFIGURATION DES TESTS
  * ============================================================================ */
 
 int main(void) {
