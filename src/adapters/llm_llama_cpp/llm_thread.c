@@ -140,99 +140,41 @@ static void llm_worker_func(void *arg) {
         response.id = req.id;
 
         /*
-         * TODO [DEV-C / TODO-LLM-004] : APPEL LLAMA.CPP
-         *
-         * Code à écrire :
-         *
-         *   // Tokeniser le prompt
-         *   llama_token tokens[4096];
-         *   int n_tokens = llama_tokenize(engine->llama_model,
-         *                                 req.prompt, strlen(req.prompt),
-         *                                 tokens, 4096, true, true);
-         *
-         *   // Évaluation
-         *   llama_decode(engine->llama_ctx, llama_batch_get_one(tokens, n_tokens, 0, 0));
-         *
-         *   // Génération token par token
-         *   char result_buf[LLM_MAX_RESPONSE_LEN] = {0};
-         *   int pos = 0;
-         *   for (int i = 0; i < LLM_MAX_TOKENS && pos < LLM_MAX_RESPONSE_LEN - 1; i++) {
-         *       llama_token token = llama_sampling_sample(...);
-         *       if (token == llama_token_eos(engine->llama_model)) break;
-         *       pos += llama_token_to_piece(engine->llama_model, token,
-         *                                   result_buf + pos,
-         *                                   LLM_MAX_RESPONSE_LEN - pos - 1, false);
-         *   }
-         *   strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
-         *   response.status = LLM_STATUS_DONE;
-         */
-
-       /* Tokeniser le prompt */
-        const int max_tokens = 4096;
+        /* Tokeniser le prompt */
+        const int max_tokens = 512;
         llama_token *tokens = malloc(max_tokens * sizeof(llama_token));
         if (!tokens) {
             response.status = LLM_STATUS_ERROR;
             goto send_response;
         }
-
-        int n_tokens = llama_tokenize(
-            llama_model_get_vocab(engine->llama_ctx),
-            req.prompt, (int)strlen(req.prompt),
-            tokens, max_tokens, true, true
-        );
-
-        if (n_tokens < 0) {
-            fprintf(stderr, "[ERROR] Tokenisation échouée\n");
+        const struct llama_vocab *vocab = llama_model_get_vocab(engine->llama_model);
+        int n_tokens = llama_tokenize(vocab, req.prompt, (int)strlen(req.prompt), tokens, max_tokens, true, true);
+        if (n_tokens <= 0) {
             free(tokens);
             response.status = LLM_STATUS_ERROR;
             goto send_response;
         }
-
-        /* Évaluation du prompt */
-        /* llama_kv_cache_clear: non disponible dans cette version */
+        printf("[LLM] %d tokens\n", n_tokens);
         struct llama_batch batch = llama_batch_get_one(tokens, n_tokens);
         llama_decode(engine->llama_ctx, batch);
-
-        /* Génération des tokens de réponse */
         char result_buf[LLM_MAX_RESPONSE_LEN] = {0};
-        int  pos = 0;
-
-        struct llama_sampler *sampler = llama_sampler_chain_init(
-            llama_sampler_chain_default_params()
-        );
+        int pos = 0;
+        struct llama_sampler *sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
         llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
-
-        for (int t = 0; t < LLM_MAX_TOKENS && pos < LLM_MAX_RESPONSE_LEN - 1; t++) {
-            llama_token token = llama_sampler_sample(sampler, engine->llama_ctx, -1);
-
-            if (llama_vocab_is_eog(
-                    llama_model_get_vocab(engine->llama_ctx), token)) {
-                break;
-            }
-
+        for (int t = 0; t < 200 && pos < LLM_MAX_RESPONSE_LEN - 64; t++) {
+            llama_token tok = llama_sampler_sample(sampler, engine->llama_ctx, -1);
+            if (llama_vocab_is_eog(vocab, tok)) break;
             char piece[64] = {0};
-            int  piece_len = llama_token_to_piece(
-                llama_model_get_vocab(engine->llama_ctx),
-                token, piece, sizeof(piece) - 1, 0, true
-            );
-
-            if (piece_len > 0 && pos + piece_len < LLM_MAX_RESPONSE_LEN) {
-                memcpy(result_buf + pos, piece, piece_len);
-                pos += piece_len;
-            }
-
-            /* Préparer le token suivant */
-            struct llama_batch next = llama_batch_get_one(&token, 1);
-            llama_decode(engine->llama_ctx, next);
+            int plen = llama_token_to_piece(vocab, tok, piece, 63, 0, true);
+            if (plen > 0) { memcpy(result_buf + pos, piece, plen); pos += plen; printf("%s", piece); fflush(stdout); }
+            struct llama_batch nb = llama_batch_get_one(&tok, 1);
+            llama_decode(engine->llama_ctx, nb);
         }
-
         llama_sampler_free(sampler);
         free(tokens);
-
         strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
-        response.status     = LLM_STATUS_DONE;
+        response.status = LLM_STATUS_DONE;
         response.confidence = 1.0f;
-
         send_response:
 
         /* Appeler le callback si défini */
