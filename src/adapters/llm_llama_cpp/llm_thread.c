@@ -40,7 +40,9 @@
  *   Décommenter quand llama.cpp est disponible.
  *   Voir : https://github.com/ggerganov/llama.cpp
  */
-/* #include <llama.h> */
+ #include <llama.h>
+
+ 
 
 /* ============================================================================
  * STRUCTURES INTERNES (privées)
@@ -165,13 +167,73 @@ static void llm_worker_func(void *arg) {
          *   response.status = LLM_STATUS_DONE;
          */
 
-        /* STUB : réponse simulée */
-        snprintf(response.text, LLM_MAX_RESPONSE_LEN,
-                 "[STUB LLM] Réponse simulée pour la requête %u. "
-                 "TODO: brancher llama.cpp (TODO-LLM-004).",
-                 req.id);
-        response.status = LLM_STATUS_DONE;
-        response.confidence = 0.8f;
+       /* Tokeniser le prompt */
+        const int max_tokens = 4096;
+        llama_token *tokens = malloc(max_tokens * sizeof(llama_token));
+        if (!tokens) {
+            response.status = LLM_STATUS_ERROR;
+            goto send_response;
+        }
+
+        int n_tokens = llama_tokenize(
+            llama_model_get_vocab(engine->llama_ctx),
+            req.prompt, (int)strlen(req.prompt),
+            tokens, max_tokens, true, true
+        );
+
+        if (n_tokens < 0) {
+            fprintf(stderr, "[ERROR] Tokenisation échouée\n");
+            free(tokens);
+            response.status = LLM_STATUS_ERROR;
+            goto send_response;
+        }
+
+        /* Évaluation du prompt */
+        /* llama_kv_cache_clear: non disponible dans cette version */
+        struct llama_batch batch = llama_batch_get_one(tokens, n_tokens);
+        llama_decode(engine->llama_ctx, batch);
+
+        /* Génération des tokens de réponse */
+        char result_buf[LLM_MAX_RESPONSE_LEN] = {0};
+        int  pos = 0;
+
+        struct llama_sampler *sampler = llama_sampler_chain_init(
+            llama_sampler_chain_default_params()
+        );
+        llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+
+        for (int t = 0; t < LLM_MAX_TOKENS && pos < LLM_MAX_RESPONSE_LEN - 1; t++) {
+            llama_token token = llama_sampler_sample(sampler, engine->llama_ctx, -1);
+
+            if (llama_vocab_is_eog(
+                    llama_model_get_vocab(engine->llama_ctx), token)) {
+                break;
+            }
+
+            char piece[64] = {0};
+            int  piece_len = llama_token_to_piece(
+                llama_model_get_vocab(engine->llama_ctx),
+                token, piece, sizeof(piece) - 1, 0, true
+            );
+
+            if (piece_len > 0 && pos + piece_len < LLM_MAX_RESPONSE_LEN) {
+                memcpy(result_buf + pos, piece, piece_len);
+                pos += piece_len;
+            }
+
+            /* Préparer le token suivant */
+            struct llama_batch next = llama_batch_get_one(&token, 1);
+            llama_decode(engine->llama_ctx, next);
+        }
+
+        llama_sampler_free(sampler);
+        free(tokens);
+
+        strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
+        response.status     = LLM_STATUS_DONE;
+        response.confidence = 1.0f;
+
+        send_response:
 
         /* Appeler le callback si défini */
         if (req.callback) {
@@ -210,7 +272,7 @@ LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
      *
      *   llama_backend_init();
      *
-     *   llama_model_params mparams = llama_model_default_params();
+     *   struct llama_model_params mparams = llama_model_default_params();
      *   engine->llama_model = llama_load_model_from_file(model_path, mparams);
      *   if (!engine->llama_model) {
      *       fprintf(stderr, "Impossible de charger le modèle: %s\n", model_path);
@@ -218,16 +280,34 @@ LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
      *       return NULL;
      *   }
      *
-     *   llama_context_params cparams = llama_context_default_params();
+     *   struct llama_context_params cparams = llama_context_default_params();
      *   cparams.n_ctx = n_ctx;
      *   cparams.n_threads = n_threads;
      *   engine->llama_ctx = llama_new_context_with_model(engine->llama_model, cparams);
      */
 
-    (void)n_threads;
-    (void)n_ctx;
-    fprintf(stderr, "[STUB] llm_create: modèle non chargé (TODO-LLM-005)\n");
-    printf("[INFO] LLM créé (stub) — modèle: %s\n", model_path ? model_path : "(aucun)");
+    llama_backend_init();
+
+    struct llama_model_params mparams = llama_model_default_params();
+    engine->llama_model = llama_model_load_from_file(model_path, mparams);
+    if (!engine->llama_model) {
+        fprintf(stderr, "[ERROR] Impossible de charger le modèle: %s\n", model_path);
+        llm_destroy(engine);
+        return NULL;
+    }
+
+    struct llama_context_params cparams = llama_context_default_params();
+    cparams.n_ctx     = (uint32_t)n_ctx;
+    cparams.n_threads = (uint32_t)n_threads;
+    engine->llama_ctx = llama_init_from_model(engine->llama_model, cparams);
+    if (!engine->llama_ctx) {
+        fprintf(stderr, "[ERROR] Impossible de créer le contexte LLM\n");
+        llm_destroy(engine);
+        return NULL;
+    }
+
+    engine->model_loaded = true;
+    printf("[INFO] Modèle LLM chargé: %s\n", model_path);
 
     return engine;
 }
@@ -259,10 +339,9 @@ void llm_destroy(LlmEngine *engine) {
         }
     }
 
-    /* TODO [DEV-C / TODO-LLM-006] : libérer llama.cpp */
-    /* if (engine->llama_ctx)   llama_free(engine->llama_ctx); */
-    /* if (engine->llama_model) llama_free_model(engine->llama_model); */
-    /* llama_backend_free(); */
+ if (engine->llama_ctx)   llama_free(engine->llama_ctx);
+    if (engine->llama_model) llama_model_free(engine->llama_model);
+    llama_backend_free();
 
     mutex_destroy(engine->mutex);
     condvar_destroy(engine->cond_work);
@@ -270,8 +349,7 @@ void llm_destroy(LlmEngine *engine) {
 }
 
 bool llm_is_ready(const LlmEngine *engine) {
-    return engine && engine->running;
-    /* TODO [DEV-C / TODO-LLM-007] : vérifier aussi engine->model_loaded */
+   return engine && engine->running && engine->model_loaded;
 }
 
 LlmRequestId llm_submit_request(LlmEngine   *engine,
