@@ -52,11 +52,16 @@ size_t llm_prompt_grammar_check(const char *text, char *out_buf, size_t buf_size
      */
 
     return (size_t)snprintf(out_buf, buf_size,
-        "[INST] %s\n\n"
-        "Analyse le texte suivant et identifie les fautes grammaticales. "
-        "Réponds uniquement avec un objet JSON contenant un tableau 'errors'. "
-        "Chaque erreur a les champs: original, corrected, type, position.\n\n"
-        "Texte:\n%s\n[/INST]",
+        "<|im_start|>system\n%s<|im_end|>\n"
+        "<|im_start|>user\n"
+        "Analyse ce texte et retourne UNIQUEMENT ce JSON :\n"
+        "{\"errors\": [{\"original\": \"mot fautif\", "
+        "\"corrected\": \"correction\", "
+        "\"type\": \"orthographe|grammaire|style\", "
+        "\"position\": 0}]}\n\n"
+        "Texte a analyser:\n%s\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n",
         SYSTEM_PROMPT, text);
 }
 
@@ -67,12 +72,17 @@ size_t llm_prompt_reformulate(const char *text, char *out_buf, size_t buf_size) 
      *   Retourner JSON : {"reformulation": "...", "changes": [...]}
      */
 
-    return (size_t)snprintf(out_buf, buf_size,
-        "[INST] %s\n\n"
-        "Reformule la phrase suivante de manière plus académique et claire, "
-        "en conservant exactement le même sens. "
-        "Réponds avec JSON: {\"reformulation\": \"...\"}\n\n"
-        "Phrase: %s\n[/INST]",
+   return (size_t)snprintf(out_buf, buf_size,
+        "<|im_start|>system\n%s<|im_end|>\n"
+        "<|im_start|>user\n"
+        "Reformule cette phrase en français académique. "
+        "Conserve le sens exact. "
+        "Retourne UNIQUEMENT ce JSON :\n"
+        "{\"reformulation\": \"ta reformulation ici\", "
+        "\"changes\": [\"changement 1\", \"changement 2\"]}\n\n"
+        "Phrase originale:\n%s\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n",
         SYSTEM_PROMPT, text);
 }
 
@@ -86,12 +96,16 @@ size_t llm_prompt_semantic_check(const char *question,
      *   Format : {"answer": "yes"|"no"|"partial", "explanation": "..."}
      */
 
-    return (size_t)snprintf(out_buf, buf_size,
-        "[INST] %s\n\n"
-        "Question sur le texte suivant:\n"
+  return (size_t)snprintf(out_buf, buf_size,
+        "<|im_start|>system\n%s<|im_end|>\n"
+        "<|im_start|>user\n"
+        "Reponds a cette question sur le texte ci-dessous.\n"
         "Question: %s\n\n"
-        "Réponds uniquement avec JSON: "
-        "{\"answer\": \"yes\"|\"no\"|\"partial\", \"explanation\": \"...\"}\n\n"
-        "Texte de la section:\n%s\n[/INST]",
+        "Retourne UNIQUEMENT ce JSON :\n"
+        "{\"answer\": \"yes\", \"explanation\": \"explication courte\"}\n"
+        "Les valeurs possibles pour 'answer' sont : yes, no, partial.\n\n"
+        "Texte:\n%s\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n",
         SYSTEM_PROMPT, question, section);
 }
