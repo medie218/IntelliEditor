@@ -52,13 +52,40 @@
  * @param needed  Nombre d'octets à insérer.
  * @return true   Si le gap est suffisant (ou a été agrandi avec succès).
  */
-static bool gap_buffer_ensure_gap(GapBuffer *gb, size_t needed) {
-    /* STUB — TODO [DEV-A / TODO-GAPBUF-001] */
-    (void)gb;
+    static bool gap_buffer_ensure_gap(GapBuffer *gb, size_t needed) {
+    /* Vérifie si le gap est assez grand */
+    size_t gap_size = gb->gap_end - gb->gap_start;
+    if (gap_size >= needed) return true; /* Déjà assez grand */
+ 
+    /* Calcul de la nouvelle capacité (on double) */
+    size_t new_cap = gb->capacity * 2;
+    if (new_cap < gb->capacity + needed + GAP_BUFFER_MIN_GAP_SIZE)
+        new_cap = gb->capacity + needed + GAP_BUFFER_MIN_GAP_SIZE;
+ 
+    /* Reallocation mémoire */
+    char *new_buf = realloc(gb->buf, new_cap);
+    if (!new_buf) return false; /* Echec mémoire */
+ 
+    /* Déplacer la partie APRÈS le gap vers la fin du nouveau buffer */
+    size_t after_len = gb->capacity - gb->gap_end;
+    memmove(new_buf + new_cap - after_len,
+            new_buf + gb->gap_end,
+            after_len);
+ 
+    /* Mettre à jour les indices */
+    gb->gap_end  = new_cap - after_len;
+    gb->capacity = new_cap;
+    gb->buf      = new_buf;
+    return true;
+
+     (void)gb;
     (void)needed;
     fprintf(stderr, "[STUB] gap_buffer_ensure_gap: pas encore implémenté\n");
     return false;
 }
+
+   
+
 
 /**
  * @brief Déplace le gap vers la position 'pos'.
