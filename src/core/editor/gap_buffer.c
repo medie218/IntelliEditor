@@ -299,4 +299,4 @@ void editor_compute_stats(const EditorDocument *doc, DocStats *stats) {
     stats->paragraph_count++;
 
     free(text);
-}
+}// test divergence
