@@ -276,3 +276,5 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
         return result;
     }
 
+    return result;
+}
