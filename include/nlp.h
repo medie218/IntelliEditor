@@ -160,6 +160,14 @@ void spellcheck_analyze(const SpellChecker *sc,
 typedef struct NlpEngine NlpEngine;
 
 /**
+ * @brief Implémentation concrète du moteur NLP.
+ * Regroupe Hunspell + pipeline d'analyse.
+ */
+struct NlpEngine {
+    SpellChecker *spell_checker; /**< Handle Hunspell (peut être NULL) */
+};
+
+/**
  * @brief Lance une analyse NLP complète sur un texte.
  *
  * Cette fonction est SYNCHRONE. Elle effectue :
