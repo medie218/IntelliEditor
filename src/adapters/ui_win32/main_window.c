@@ -52,38 +52,33 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev,
 
 
   
-
 bool ui_init(AppContext *ctx, HINSTANCE hinstance, int ncmdshow) {
-    if (!scintilla_load()) {
-        MessageBoxA(NULL, "Impossible de charger Scintilla.",
-                    "Erreur fatale", MB_ICONERROR | MB_OK);
-        return false;
-    }
-
+    /* Enregistrer la classe de fenêtre */
     WNDCLASSEXA wc = {0};
     wc.cbSize        = sizeof(WNDCLASSEXA);
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = hinstance;
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = UI_WINDOW_CLASS;
     wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-
+    wc.cbSize        = sizeof(WNDCLASSEXA);
     if (!RegisterClassExA(&wc)) return false;
-
+ 
+    /* Créer la fenêtre principale */
     ctx->hwnd_main = CreateWindowExA(
         0, UI_WINDOW_CLASS, UI_WINDOW_TITLE,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 1200, 700,
-        NULL, NULL, hinstance, ctx);
-
+        NULL, NULL, hinstance, ctx
+    );
     if (!ctx->hwnd_main) return false;
-
+ 
     ShowWindow(ctx->hwnd_main, ncmdshow);
     UpdateWindow(ctx->hwnd_main);
     return true;
 }
+
 
 int ui_run(AppContext *ctx) {
     MSG msg;
@@ -182,13 +177,25 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 /* ------------------------------------------------------------------------- */
 
 static bool create_menu(HWND hwnd) {
-    HMENU menu_bar  = CreateMenu();
-    HMENU menu_file = CreatePopupMenu();
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_EXIT, "Quitter");
-    AppendMenuA(menu_bar, MF_POPUP, (UINT_PTR)menu_file, "Fichier");
-    SetMenu(hwnd, menu_bar);
+    HMENU bar   = CreateMenu();
+    HMENU mFile = CreatePopupMenu();
+    HMENU mEdit = CreatePopupMenu();
+    HMENU mTools= CreatePopupMenu();
+    AppendMenuA(mFile, MF_STRING, ID_FILE_NEW,  'Nouveau\tCtrl+N');
+    AppendMenuA(mFile, MF_STRING, ID_FILE_OPEN, 'Ouvrir...\tCtrl+O');
+    AppendMenuA(mFile, MF_STRING, ID_FILE_SAVE, 'Enregistrer\tCtrl+S');
+    AppendMenuA(mFile, MF_SEPARATOR, 0, NULL);
+    AppendMenuA(mFile, MF_STRING, ID_FILE_EXIT, 'Quitter\tAlt+F4');
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_UNDO, 'Annuler\tCtrl+Z');
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_REDO, 'Rétablir\tCtrl+Y');
+    AppendMenuA(mTools,MF_STRING, ID_TOOLS_RULES_LOAD, 'Charger règles...');
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mFile,  'Fichier');
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mEdit,  'Edition');
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mTools, 'Outils');
+    SetMenu(hwnd, bar);
     return true;
 }
+
 
 static bool create_statusbar(AppContext *ctx) {
     ctx->hwnd_statusbar = CreateWindowExA(
