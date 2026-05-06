@@ -1,22 +1,6 @@
 /**
  * @file section_checker.c
  * @brief Vérificateur de sections — CORE / rules / checkers
- *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Implémente les checks :
- *   - CHECK_SECTION_EXISTS   → "le document contient-il une section X ?"
- *   - CHECK_SECTION_ORDER    → "les sections sont-elles dans le bon ordre ?"
- *   - CHECK_HEADING_FORMAT   → "les titres sont-ils correctement formatés ?"
- *
- * COMMENT DÉTECTER UNE SECTION ?
- *   Dans le texte brut, une section H1 est une ligne en MAJUSCULES.
- *   Une section H2 est une ligne commençant par "## " ou en Title Case.
- *   (Convention à adapter selon les décisions de l'équipe)
- *
- * RESPONSABLE : DEV-D
- * =============================================================================
  */
 
 #include "../../../include/rules.h"
@@ -25,57 +9,88 @@
 #include <ctype.h>
 #include <stdio.h>
 
+/* ============================================================================
+ * Helpers internes
+ * ============================================================================ */
+
 /**
- * @brief Vérifie si une ligne est entièrement en majuscules (titre H1).
- *
- * TODO [DEV-D / TODO-SECTION-001] :
- *   Affiner cette détection : ignorer ponctuation, gérer UTF-8.
+ * @brief Trim des espaces en début/fin.
  */
-static bool is_uppercase_line(const char *line, size_t len) {
-    /* STUB simple — ne gère pas l'UTF-8 correctement pour l'instant */
-    for (size_t i = 0; i < len; i++) {
-        if (isalpha((unsigned char)line[i]) && islower((unsigned char)line[i])) {
-            return false;
+static void trim(char *s) {
+    if (!s) return;
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len - 1])) s[--len] = '\0';
+    while (*s && isspace((unsigned char)*s)) memmove(s, s + 1, strlen(s));
+}
+
+/**
+ * @brief Vérifie si une ligne est un titre H1 (tout en majuscules).
+ */
+static bool is_h1(const char *line) {
+    bool has_alpha = false;
+    for (size_t i = 0; line[i]; i++) {
+        if (isalpha((unsigned char)line[i])) {
+            has_alpha = true;
+            if (islower((unsigned char)line[i])) return false;
         }
     }
-    return len > 0;
+    return has_alpha;
 }
 
 /**
- * @brief Recherche un titre de section dans le texte.
- *
- * TODO [DEV-D / TODO-SECTION-002] :
- *   Implémenter une recherche robuste :
- *   - Parcourir le texte ligne par ligne
- *   - Détecter les titres (H1 = majuscules, H2 = "## Titre", etc.)
- *   - Retourner la position du titre trouvé, ou SIZE_MAX si absent
- *
- * @param text         Texte complet du document.
- * @param section_name Nom de la section cherchée (ex : "Introduction").
- * @return             Position en octets, ou SIZE_MAX si non trouvé.
+ * @brief Vérifie si une ligne est un titre H2 (commence par "## ").
+ */
+static bool is_h2(const char *line) {
+    return strncmp(line, "## ", 3) == 0;
+}
+
+/**
+ * @brief Extrait une ligne du texte (jusqu'au '\n').
+ */
+static size_t extract_line(const char *text, size_t start, char *out, size_t max) {
+    size_t i = 0;
+    while (text[start + i] && text[start + i] != '\n' && i < max - 1) {
+        out[i] = text[start + i];
+        i++;
+    }
+    out[i] = '\0';
+    return i;
+}
+
+/**
+ * @brief Recherche une section par son nom (H1 ou H2).
  */
 static size_t find_section(const char *text, const char *section_name) {
-    /* STUB — recherche naïve, à améliorer */
-    const char *pos = strstr(text, section_name);
-    if (!pos) return SIZE_MAX;
-    return (size_t)(pos - text);
+    size_t len = strlen(text);
+    size_t pos = 0;
+
+    char line[512];
+
+    while (pos < len) {
+        size_t consumed = extract_line(text, pos, line, sizeof(line));
+        trim(line);
+
+        if (is_h1(line) || is_h2(line)) {
+            if (strcasecmp(line, section_name) == 0) {
+                return pos;
+            }
+        }
+
+        pos += consumed + 1;
+    }
+
+    return SIZE_MAX;
 }
 
-/**
- * @brief Checker : CHECK_SECTION_EXISTS
- *
- * TODO [DEV-D / TODO-SECTION-003] :
- *   - Lire rule->parameter (nom de la section)
- *   - Appeler find_section()
- *   - Si trouvé : STATUS_PASS
- *   - Si absent : STATUS_FAIL avec message explicatif
- */
+/* ============================================================================
+ * CHECK_SECTION_EXISTS
+ * ============================================================================ */
+
 RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) {
-    RuleResult result;
-    memset(&result, 0, sizeof(result));
+    RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
 
-    (void)len; /* TODO : utiliser len pour les bornes */
+    (void)len;
 
     size_t pos = find_section(text, rule->parameter);
 
@@ -87,58 +102,138 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
     } else {
         result.status = STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
-                 "Section '%s' manquante dans le document", rule->parameter);
+                 "Section '%s' manquante", rule->parameter);
         result.position = 0;
     }
 
     return result;
 }
 
-/**
- * @brief Checker : CHECK_SECTION_ORDER
- *
- * TODO [DEV-D / TODO-SECTION-004] :
- *   - Parser rule->parameter comme un tableau JSON (via cJSON)
- *   - Trouver la position de chaque section dans le texte
- *   - Vérifier que les positions sont croissantes
- *   - Si une section est absente, l'ignorer ou l'indiquer dans le message
- */
+/* ============================================================================
+ * CHECK_SECTION_ORDER
+ * ============================================================================ */
+
 RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
-    RuleResult result;
-    memset(&result, 0, sizeof(result));
+    RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
 
-    (void)text;
     (void)len;
 
-    /* STUB — TODO [DEV-D / TODO-SECTION-004] */
-    result.status = STATUS_SKIPPED;
-    snprintf(result.message, sizeof(result.message),
-             "TODO: check_section_order non implémenté (nécessite cJSON)");
+    /**
+     * rule->parameter contient un tableau JSON sérialisé :
+     *   ["Introduction", "Méthodologie", "Résultats", "Conclusion"]
+     *
+     * On doit :
+     *   1. parser ce JSON
+     *   2. trouver la position de chaque section
+     *   3. vérifier que pos[i] < pos[i+1]
+     */
 
+    cJSON *arr = cJSON_Parse(rule->parameter);
+    if (!arr || !cJSON_IsArray(arr)) {
+        result.status = STATUS_ERROR;
+        snprintf(result.message, sizeof(result.message),
+                 "Paramètre invalide pour section_order");
+        cJSON_Delete(arr);
+        return result;
+    }
+
+    size_t last_pos = 0;
+    bool first = true;
+
+    for (int i = 0; i < cJSON_GetArraySize(arr); i++) {
+        cJSON *item = cJSON_GetArrayItem(arr, i);
+        if (!cJSON_IsString(item)) continue;
+
+        size_t pos = find_section(text, item->valuestring);
+
+        if (pos == SIZE_MAX) {
+            // section absente → on ignore mais on note
+            continue;
+        }
+
+        if (!first && pos < last_pos) {
+            result.status = STATUS_FAIL;
+            snprintf(result.message, sizeof(result.message),
+                     "Ordre incorrect : '%s' apparaît avant '%s'",
+                     item->valuestring,
+                     cJSON_GetArrayItem(arr, i - 1)->valuestring);
+            cJSON_Delete(arr);
+            return result;
+        }
+
+        last_pos = pos;
+        first = false;
+    }
+
+    cJSON_Delete(arr);
+
+    result.status = STATUS_PASS;
+    snprintf(result.message, sizeof(result.message),
+             "Ordre des sections correct");
     return result;
 }
 
-/**
- * @brief Checker : CHECK_HEADING_FORMAT
- *
- * TODO [DEV-D / TODO-SECTION-005] :
- *   - Parser rule->parameter : { "level": 1, "case": "uppercase" }
- *   - Trouver tous les titres du niveau demandé
- *   - Vérifier leur format (majuscules, title case, etc.)
- */
+/* ============================================================================
+ * CHECK_HEADING_FORMAT
+ * ============================================================================ */
+
 RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) {
-    RuleResult result;
-    memset(&result, 0, sizeof(result));
+    RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
 
-    (void)text;
     (void)len;
 
-    /* STUB — TODO [DEV-D / TODO-SECTION-005] */
-    result.status = STATUS_SKIPPED;
-    snprintf(result.message, sizeof(result.message),
-             "TODO: check_heading_format non implémenté");
+    /**
+     * rule->parameter = {"level": 1, "case": "uppercase"}
+     */
 
+    cJSON *obj = cJSON_Parse(rule->parameter);
+    if (!obj) {
+        result.status = STATUS_ERROR;
+        snprintf(result.message, sizeof(result.message),
+                 "Paramètre JSON invalide");
+        return result;
+    }
+
+    int level = cJSON_GetObjectItem(obj, "level")->valueint;
+    const char *case_fmt = cJSON_GetObjectItem(obj, "case")->valuestring;
+
+    bool want_upper = (strcmp(case_fmt, "uppercase") == 0);
+
+    size_t pos = 0;
+    char line[512];
+
+    while (pos < strlen(text)) {
+        size_t consumed = extract_line(text, pos, line, sizeof(line));
+        trim(line);
+
+        bool is_title =
+            (level == 1 && is_h1(line)) ||
+            (level == 2 && is_h2(line));
+
+        if (is_title) {
+            if (want_upper) {
+                for (size_t i = 0; line[i]; i++) {
+                    if (isalpha((unsigned char)line[i]) &&
+                        islower((unsigned char)line[i])) {
+                        result.status = STATUS_FAIL;
+                        snprintf(result.message, sizeof(result.message),
+                                 "Titre '%s' n'est pas en majuscules", line);
+                        cJSON_Delete(obj);
+                        return result;
+                    }
+                }
+            }
+        }
+
+        pos += consumed + 1;
+    }
+
+    cJSON_Delete(obj);
+
+    result.status = STATUS_PASS;
+    snprintf(result.message, sizeof(result.message),
+             "Format des titres correct");
     return result;
 }

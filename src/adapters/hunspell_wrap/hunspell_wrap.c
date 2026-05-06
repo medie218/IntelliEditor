@@ -220,3 +220,4 @@ void spellcheck_analyze(const SpellChecker *sc,
         i++;
     }
 }
+   

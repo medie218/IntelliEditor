@@ -107,5 +107,5 @@ size_t llm_prompt_semantic_check(const char *question,
         "Texte:\n%s\n"
         "<|im_end|>\n"
         "<|im_start|>assistant\n",
-        SYSTEM_PROMPT, question, section);
+        SYSTEM_PROMPT, question, section);   
 }

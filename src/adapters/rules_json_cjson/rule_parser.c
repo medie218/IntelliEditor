@@ -1,18 +1,6 @@
 /**
  * @file rule_parser.c
  * @brief Parser JSON des fichiers de règles — ADAPTER / rules_json_cjson
- *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Transforme un fichier JSON de règles en une structure RuleSet (définie
- * dans rules.h). C'est le seul endroit où cJSON est utilisé pour les règles.
- *
- * DÉPENDANCE : cJSON (https://github.com/DaveGamble/cJSON)
- * Compilation : linker avec -lcjson
- *
- * RESPONSABLE : DEV-D
- * =============================================================================
  */
 
 #include "../../../include/rules.h"
@@ -21,19 +9,26 @@
 #include <string.h>
 #include <stdio.h>
 
-/*
- * TODO [DEV-D / TODO-PARSER-001] :
- *   Décommenter l'include cJSON quand la bibliothèque est disponible.
- *   Pour l'instant, le parser est un stub qui charge zéro règles.
- */
-/* #include <cjson/cJSON.h> */
+#include <cjson/cJSON.h>   /* Phase 2 : parser JSON */
 
-/**
- * @brief Convertit la chaîne "check_type" du JSON en enum CheckType.
- *
- * TODO [DEV-D / TODO-PARSER-002] :
- *   Ajouter tous les types manquants.
- */
+/* ============================================================================
+ * Helpers internes
+ * ============================================================================ */
+
+static char *dup_json_string(cJSON *item) {
+    if (!item || !cJSON_IsString(item)) return NULL;
+    return strdup(item->valuestring);
+}
+
+static char *serialize_json(cJSON *item) {
+    if (!item) return NULL;
+    return cJSON_PrintUnformatted(item);
+}
+
+/* ============================================================================
+ * parse_check_type() et parse_severity() déjà corrects
+ * ============================================================================ */
+
 static CheckType parse_check_type(const char *str) {
     if (!str) return CHECK_UNKNOWN;
     if (strcmp(str, "section_exists")  == 0) return CHECK_SECTION_EXISTS;
@@ -45,13 +40,9 @@ static CheckType parse_check_type(const char *str) {
     if (strcmp(str, "heading_format")  == 0) return CHECK_HEADING_FORMAT;
     if (strcmp(str, "citation_present")== 0) return CHECK_CITATION_PRESENT;
     if (strcmp(str, "llm_semantic")    == 0) return CHECK_LLM_SEMANTIC;
-    fprintf(stderr, "[WARN] Type de check inconnu: '%s'\n", str);
     return CHECK_UNKNOWN;
 }
 
-/**
- * @brief Convertit la chaîne "severity" du JSON en enum Severity.
- */
 static Severity parse_severity(const char *str) {
     if (!str) return SEVERITY_WARNING;
     if (strcmp(str, "error")   == 0) return SEVERITY_ERROR;
@@ -60,105 +51,121 @@ static Severity parse_severity(const char *str) {
     return SEVERITY_WARNING;
 }
 
-/**
- * @brief Charge un fichier JSON de règles et retourne un RuleSet.
- *
- * TODO [DEV-D / TODO-PARSER-003] : IMPLÉMENTATION PRINCIPALE
- *
- * Étapes à suivre :
- *   1. Lire le fichier avec storage_read_file()
- *   2. Parser le JSON avec cJSON_Parse()
- *   3. Extraire les métadonnées depuis l'objet "meta"
- *   4. Parcourir le tableau "rules" et remplir set->rules[]
- *   5. Pour chaque règle :
- *      a. Lire "id", "description", "category", "check_type", "severity"
- *      b. Lire "parameter" (peut être string, objet ou tableau)
- *         → sérialiser en JSON string si c'est un objet/tableau
- *      c. Lire "flags" si présent (case_insensitive)
- *      d. Lire "target_section" si présent
- *   6. Libérer le JSON avec cJSON_Delete()
- *   7. Retourner le RuleSet
- *
- * @param filepath  Chemin vers le fichier .json (UTF-8).
- * @return          RuleSet alloué, ou NULL si erreur.
- */
+/* ============================================================================
+ * parse_rule_object() — cœur du parser
+ * ============================================================================ */
+
+static void parse_rule_object(cJSON *obj, Rule *out) {
+    if (!obj || !out) return;
+
+    /* id */
+    cJSON *id = cJSON_GetObjectItem(obj, "id");
+    if (cJSON_IsString(id))
+        strncpy(out->id, id->valuestring, RULES_MAX_ID_LEN - 1);
+
+    /* description */
+    cJSON *desc = cJSON_GetObjectItem(obj, "description");
+    if (cJSON_IsString(desc))
+        strncpy(out->description, desc->valuestring, RULES_MAX_DESC_LEN - 1);
+
+    /* category */
+    cJSON *cat = cJSON_GetObjectItem(obj, "category");
+    if (cJSON_IsString(cat))
+        strncpy(out->category, cat->valuestring, RULES_MAX_CATEGORY_LEN - 1);
+
+    /* check_type */
+    cJSON *ctype = cJSON_GetObjectItem(obj, "check_type");
+    if (cJSON_IsString(ctype))
+        out->check_type = parse_check_type(ctype->valuestring);
+
+    /* severity */
+    cJSON *sev = cJSON_GetObjectItem(obj, "severity");
+    if (cJSON_IsString(sev))
+        out->severity = parse_severity(sev->valuestring);
+
+    /* parameter : string / object / array */
+    cJSON *param = cJSON_GetObjectItem(obj, "parameter");
+    if (param) {
+        if (cJSON_IsString(param)) {
+            strncpy(out->parameter, param->valuestring, RULES_MAX_PARAM_LEN - 1);
+        } else {
+            char *json = serialize_json(param);
+            if (json) {
+                strncpy(out->parameter, json, RULES_MAX_PARAM_LEN - 1);
+                free(json);
+            }
+        }
+    }
+
+    /* flags */
+    cJSON *flags = cJSON_GetObjectItem(obj, "flags");
+    if (flags && cJSON_IsObject(flags)) {
+        cJSON *ci = cJSON_GetObjectItem(flags, "case_insensitive");
+        out->flags.case_insensitive = cJSON_IsBool(ci) ? cJSON_IsTrue(ci) : false;
+    }
+
+    /* target_section */
+    cJSON *ts = cJSON_GetObjectItem(obj, "target_section");
+    if (cJSON_IsString(ts))
+        strncpy(out->target_section, ts->valuestring, RULES_MAX_SECTION_LEN - 1);
+}
+
+/* ============================================================================
+ * ruleset_load_from_file() — fonction principale
+ * ============================================================================ */
+
 RuleSet *ruleset_load_from_file(const char *filepath) {
     if (!filepath) return NULL;
 
-    printf("[INFO] Chargement des règles depuis: %s\n", filepath);
-
-    /* Étape 1 : lire le fichier */
-    size_t file_len = 0;
-    char *json_text = storage_read_file(filepath, &file_len);
+    size_t len = 0;
+    char *json_text = storage_read_file(filepath, &len);
     if (!json_text) {
-        fprintf(stderr, "[ERROR] Impossible de lire le fichier: %s\n", filepath);
+        fprintf(stderr, "[ERROR] Impossible de lire %s\n", filepath);
         return NULL;
     }
 
-    RuleSet *set = ruleset_create();
-    if (!set) {
-        free(json_text);
-        return NULL;
-    }
-
-    /*
-     * TODO [DEV-D / TODO-PARSER-003] : Parser le JSON ici.
-     *
-     * Code à écrire avec cJSON :
-     *
-     *   cJSON *root = cJSON_Parse(json_text);
-     *   if (!root) {
-     *       fprintf(stderr, "Erreur JSON: %s\n", cJSON_GetErrorPtr());
-     *       goto cleanup;
-     *   }
-     *
-     *   // Métadonnées
-     *   cJSON *meta = cJSON_GetObjectItem(root, "meta");
-     *   if (meta) {
-     *       const char *doctype = cJSON_GetStringValue(
-     *           cJSON_GetObjectItem(meta, "document_type"));
-     *       if (doctype)
-     *           strncpy(set->meta.document_type, doctype, 63);
-     *       // ... idem pour version, author, description
-     *   }
-     *
-     *   // Règles
-     *   cJSON *rules_arr = cJSON_GetObjectItem(root, "rules");
-     *   cJSON *rule_json = NULL;
-     *   cJSON_ArrayForEach(rule_json, rules_arr) {
-     *       if (set->rule_count >= RULES_MAX_RULES) break;
-     *       Rule *r = &set->rules[set->rule_count];
-     *
-     *       const char *id = cJSON_GetStringValue(
-     *           cJSON_GetObjectItem(rule_json, "id"));
-     *       if (id) strncpy(r->id, id, RULES_MAX_ID_LEN - 1);
-     *
-     *       // ... autres champs ...
-     *
-     *       const char *check = cJSON_GetStringValue(
-     *           cJSON_GetObjectItem(rule_json, "check_type"));
-     *       r->check_type = parse_check_type(check);
-     *
-     *       set->rule_count++;
-     *   }
-     *
-     *   cJSON_Delete(root);
-     */
-
-    /* STUB : pour l'instant, on simule 1 règle de test */
-    fprintf(stderr, "[STUB] ruleset_load_from_file: parser JSON non implémenté\n");
-    fprintf(stderr, "[STUB] Fichier lu (%zu octets), mais non parsé.\n", file_len);
-
-    /* Règle de démo pour que le projet compile et tourne */
-    strncpy(set->meta.document_type, "Test", 63);
-    strncpy(set->meta.version, "0.0", 15);
-    strncpy(set->rules[0].id, "STUB-01", RULES_MAX_ID_LEN - 1);
-    strncpy(set->rules[0].description, "Règle de démonstration (stub)", RULES_MAX_DESC_LEN - 1);
-    set->rules[0].check_type = CHECK_SECTION_EXISTS;
-    set->rules[0].severity   = SEVERITY_WARNING;
-    strncpy(set->rules[0].parameter, "Introduction", RULES_MAX_PARAM_LEN - 1);
-    set->rule_count = 1;
-
+    cJSON *root = cJSON_Parse(json_text);
     free(json_text);
+
+    if (!root) {
+        fprintf(stderr, "[ERROR] JSON invalide dans %s\n", filepath);
+        return NULL;
+    }
+
+    RuleSet *set = calloc(1, sizeof(RuleSet));
+    if (!set) {
+        cJSON_Delete(root);
+        return NULL;
+    }
+
+    /* meta */
+    cJSON *meta = cJSON_GetObjectItem(root, "meta");
+    if (meta && cJSON_IsObject(meta)) {
+        cJSON *dt = cJSON_GetObjectItem(meta, "document_type");
+        if (cJSON_IsString(dt))
+            strncpy(set->meta.document_type, dt->valuestring, 63);
+
+        cJSON *ver = cJSON_GetObjectItem(meta, "version");
+        if (cJSON_IsString(ver))
+            strncpy(set->meta.version, ver->valuestring, 31);
+
+        cJSON *auth = cJSON_GetObjectItem(meta, "author");
+        if (cJSON_IsString(auth))
+            strncpy(set->meta.author, auth->valuestring, 63);
+    }
+
+    /* rules */
+    cJSON *rules = cJSON_GetObjectItem(root, "rules");
+    if (rules && cJSON_IsArray(rules)) {
+        int count = cJSON_GetArraySize(rules);
+        set->rule_count = (count > RULES_MAX_RULES) ? RULES_MAX_RULES : count;
+
+        for (int i = 0; i < set->rule_count; i++) {
+            cJSON *obj = cJSON_GetArrayItem(rules, i);
+            parse_rule_object(obj, &set->rules[i]);
+        }
+    }
+
+    cJSON_Delete(root);
     return set;
 }
