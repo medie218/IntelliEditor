@@ -31,7 +31,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../../../include/rules.h"
+#include "../../include/rules.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

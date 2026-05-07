@@ -32,9 +32,9 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../../../include/encoding.h"
-#include "../../../include/config.h"
-#include "../../../include/storage.h"
+#include "../../include/encoding.h"
+#include "../../include/config.h"
+#include "../../include/storage.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

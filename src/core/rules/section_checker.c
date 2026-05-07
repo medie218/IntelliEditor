@@ -1,83 +1,58 @@
 #include <cjson/cJSON.h>
 /**
  * @file section_checker.c
- * @brief Vérificateur de sections — CORE / rules / checkers
+ * @brief Vérificateurs de sections — CORE / rules / checkers
+ *
+ * RESPONSABLE : DEV-D
  */
 
+<<<<<<< HEAD
 #include "rules.h"
 #include <string.h>
+=======
+#include "../../../include/rules.h"
+>>>>>>> aa759bb (feat(dev-D):Finalisation des vérificateurs du moteur de règles, corrections de sécurité mémoire, nettoyage JSON, prêt pour l'intégration)
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 
+#include <cjson/cJSON.h>   /* IMPORTANT : nécessaire pour parser rule->parameter */
+
 /* ============================================================================
- * Helpers internes
+ * find_section() — recherche insensible à la casse
  * ============================================================================ */
 
-/**
- * @brief Trim des espaces en début/fin.
- */
-static void trim(char *s) {
-    if (!s) return;
-    size_t len = strlen(s);
-    while (len > 0 && isspace((unsigned char)s[len - 1])) s[--len] = '\0';
-    while (*s && isspace((unsigned char)*s)) memmove(s, s + 1, strlen(s));
-}
+size_t find_section(const char *text, const char *section_name) {
+    if (!text || !section_name) return SIZE_MAX;
 
-/**
- * @brief Vérifie si une ligne est un titre H1 (tout en majuscules).
- */
-static bool is_h1(const char *line) {
-    bool has_alpha = false;
-    for (size_t i = 0; line[i]; i++) {
-        if (isalpha((unsigned char)line[i])) {
-            has_alpha = true;
-            if (islower((unsigned char)line[i])) return false;
-        }
-    }
-    return has_alpha;
-}
+    char name_lower[128] = {0};
+    strncpy(name_lower, section_name, 127);
 
-/**
- * @brief Vérifie si une ligne est un titre H2 (commence par "## ").
- */
-static bool is_h2(const char *line) {
-    return strncmp(line, "## ", 3) == 0;
-}
+    for (int i = 0; name_lower[i]; i++)
+        name_lower[i] = tolower((unsigned char)name_lower[i]);
 
-/**
- * @brief Extrait une ligne du texte (jusqu'au '\n').
- */
-static size_t extract_line(const char *text, size_t start, char *out, size_t max) {
-    size_t i = 0;
-    while (text[start + i] && text[start + i] != '\n' && i < max - 1) {
-        out[i] = text[start + i];
-        i++;
-    }
-    out[i] = '\0';
-    return i;
-}
+    const char *line = text;
 
-/**
- * @brief Recherche une section par son nom (H1 ou H2).
- */
-static size_t find_section(const char *text, const char *section_name) {
-    size_t len = strlen(text);
-    size_t pos = 0;
+    while (*line) {
+        const char *end = strchr(line, '\n');
+        if (!end) end = line + strlen(line);
 
-    char line[512];
+        size_t line_len = end - line;
+        char line_copy[256] = {0};
+        size_t copy_len = (line_len < 255) ? line_len : 255;
+        strncpy(line_copy, line, copy_len);
 
-    while (pos < len) {
-        size_t consumed = extract_line(text, pos, line, sizeof(line));
-        trim(line);
+        char line_lower[256] = {0};
+        strncpy(line_lower, line_copy, 255);
 
-        if (is_h1(line) || is_h2(line)) {
-            if (strcasecmp(line, section_name) == 0) {
-                return pos;
-            }
-        }
+        for (int i = 0; line_lower[i]; i++)
+            line_lower[i] = tolower((unsigned char)line_lower[i]);
 
-        pos += consumed + 1;
+        if (strstr(line_lower, name_lower))
+            return (size_t)(line - text);
+
+        line = (*end) ? end + 1 : end;
     }
 
     return SIZE_MAX;
@@ -88,23 +63,29 @@ static size_t find_section(const char *text, const char *section_name) {
  * ============================================================================ */
 
 RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) {
-    RuleResult result = {0};
+    RuleResult result;
+    memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
 
-    (void)len;
+    const char *section = rule->parameter;
 
-    size_t pos = find_section(text, rule->parameter);
-
-    if (pos != SIZE_MAX) {
-        result.status = STATUS_PASS;
+    if (!section || strlen(section) == 0) {
+        result.status = STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
-                 "Section '%s' trouvée", rule->parameter);
-        result.position = pos;
-    } else {
+                 "Paramètre section manquant");
+        return result;
+    }
+
+    size_t pos = find_section(text, section);
+
+    if (pos == SIZE_MAX) {
         result.status = STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
-                 "Section '%s' manquante", rule->parameter);
-        result.position = 0;
+                 "Section '%s' introuvable", section);
+    } else {
+        result.status = STATUS_PASS;
+        snprintf(result.message, sizeof(result.message),
+                 "Section '%s' trouvée", section);
     }
 
     return result;
@@ -115,32 +96,21 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
  * ============================================================================ */
 
 RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
-    RuleResult result = {0};
+    RuleResult result;
+    memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
-
-    (void)len;
-
-    /**
-     * rule->parameter contient un tableau JSON sérialisé :
-     *   ["Introduction", "Méthodologie", "Résultats", "Conclusion"]
-     *
-     * On doit :
-     *   1. parser ce JSON
-     *   2. trouver la position de chaque section
-     *   3. vérifier que pos[i] < pos[i+1]
-     */
 
     cJSON *arr = cJSON_Parse(rule->parameter);
     if (!arr || !cJSON_IsArray(arr)) {
         result.status = STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre invalide pour section_order");
-        cJSON_Delete(arr);
+        if (arr) cJSON_Delete(arr);
         return result;
     }
 
     size_t last_pos = 0;
-    bool first = true;
+    bool order_ok = true;
 
     for (int i = 0; i < cJSON_GetArraySize(arr); i++) {
         cJSON *item = cJSON_GetArrayItem(arr, i);
@@ -148,30 +118,30 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
 
         size_t pos = find_section(text, item->valuestring);
 
-        if (pos == SIZE_MAX) {
-            // section absente → on ignore mais on note
-            continue;
-        }
+        if (pos == SIZE_MAX) continue;
 
-        if (!first && pos < last_pos) {
-            result.status = STATUS_FAIL;
+        if (pos < last_pos) {
+            order_ok = false;
             snprintf(result.message, sizeof(result.message),
-                     "Ordre incorrect : '%s' apparaît avant '%s'",
+                     "Section '%s' avant '%s'",
                      item->valuestring,
                      cJSON_GetArrayItem(arr, i - 1)->valuestring);
-            cJSON_Delete(arr);
-            return result;
+            break;
         }
 
         last_pos = pos;
-        first = false;
     }
 
     cJSON_Delete(arr);
 
-    result.status = STATUS_PASS;
-    snprintf(result.message, sizeof(result.message),
-             "Ordre des sections correct");
+    if (order_ok) {
+        result.status = STATUS_PASS;
+        snprintf(result.message, sizeof(result.message),
+                 "Ordre des sections correct");
+    } else {
+        result.status = STATUS_WARNING;
+    }
+
     return result;
 }
 
@@ -180,61 +150,67 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
  * ============================================================================ */
 
 RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) {
-    RuleResult result = {0};
+    RuleResult result;
+    memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
 
-    (void)len;
-
-    /**
-     * rule->parameter = {"level": 1, "case": "uppercase"}
-     */
-
     cJSON *obj = cJSON_Parse(rule->parameter);
-    if (!obj) {
+    if (!obj || !cJSON_IsObject(obj)) {
         result.status = STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
-                 "Paramètre JSON invalide");
+                 "Paramètre JSON invalide pour heading_format");
+        if (obj) cJSON_Delete(obj);
         return result;
     }
 
-    int level = cJSON_GetObjectItem(obj, "level")->valueint;
-    const char *case_fmt = cJSON_GetObjectItem(obj, "case")->valuestring;
+    cJSON *level_item = cJSON_GetObjectItem(obj, "level");
+    cJSON *case_item = cJSON_GetObjectItem(obj, "case");
 
-    bool want_upper = (strcmp(case_fmt, "uppercase") == 0);
+    if (!cJSON_IsNumber(level_item) || !cJSON_IsString(case_item)) {
+        result.status = STATUS_ERROR;
+        snprintf(result.message, sizeof(result.message),
+                 "Paramètres 'level' et 'case' requis pour heading_format");
+        cJSON_Delete(obj);
+        return result;
+    }
 
-    size_t pos = 0;
-    char line[512];
+    int level = level_item->valueint;
+    const char *case_fmt = case_item->valuestring;
 
-    while (pos < strlen(text)) {
-        size_t consumed = extract_line(text, pos, line, sizeof(line));
-        trim(line);
+    cJSON_Delete(obj);
 
-        bool is_title =
-            (level == 1 && is_h1(line)) ||
-            (level == 2 && is_h2(line));
+    char expected_prefix[8] = {0};
+    for (int i = 0; i < level && i < 7; i++)
+        expected_prefix[i] = '#';
 
-        if (is_title) {
-            if (want_upper) {
-                for (size_t i = 0; line[i]; i++) {
+    const char *line = text;
+
+    while (*line) {
+        const char *end = strchr(line, '\n');
+        if (!end) end = line + strlen(line);
+
+        size_t len_line = end - line;
+
+        if (len_line >= (size_t)level && strncmp(line, expected_prefix, level) == 0) {
+            if (strcmp(case_fmt, "uppercase") == 0) {
+                for (size_t i = level; i < len_line; i++) {
                     if (isalpha((unsigned char)line[i]) &&
-                        islower((unsigned char)line[i])) {
+                        !isupper((unsigned char)line[i])) {
                         result.status = STATUS_FAIL;
                         snprintf(result.message, sizeof(result.message),
-                                 "Titre '%s' n'est pas en majuscules", line);
-                        cJSON_Delete(obj);
+                                 "Titre non en majuscules : %.20s", line);
                         return result;
                     }
                 }
             }
         }
 
-        pos += consumed + 1;
+        line = (*end) ? end + 1 : end;
     }
-
-    cJSON_Delete(obj);
 
     result.status = STATUS_PASS;
     snprintf(result.message, sizeof(result.message),
              "Format des titres correct");
+
     return result;
 }
