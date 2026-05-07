@@ -195,6 +195,28 @@ static bool create_menu(HWND hwnd) {
     SetMenu(hwnd, bar);
     return true;
 }
+case WM_SIZE: {
+    if (!ctx) break;
+    RECT rc; GetClientRect(hwnd, &rc);
+    int W = rc.right; int H = rc.bottom;
+    int toolbar_h = 30; int status_h = 20;
+    int panel_w   = UI_RULES_PANEL_W;
+    int edit_w    = W - panel_w;
+    int edit_h    = H - toolbar_h - status_h;
+ 
+    /* Redimensionner Scintilla */
+    if (ctx->hwnd_scintilla)
+        MoveWindow(ctx->hwnd_scintilla, 0, toolbar_h, edit_w, edit_h, TRUE);
+ 
+    /* Redimensionner le panneau règles */
+    if (ctx->hwnd_rules_panel)
+        MoveWindow(ctx->hwnd_rules_panel, edit_w, toolbar_h, panel_w, edit_h, TRUE);
+ 
+    /* Redimensionner la barre de statut */
+    if (ctx->hwnd_statusbar)
+        SendMessageA(ctx->hwnd_statusbar, WM_SIZE, 0, 0);
+    return 0;
+}
 
 
 static bool create_statusbar(AppContext *ctx) {
@@ -242,21 +264,90 @@ static bool create_toolbar(AppContext *ctx) {
 
     return true;
 }
+case WM_COMMAND: {
+    int id = LOWORD(wp);
+    switch(id) {
+ 
+    case ID_FILE_NEW:
+        if (ctx->doc->dirty) {
+            int r = MessageBoxA(hwnd,
+                'Sauvegarder avant de créer un nouveau document ?',
+                'IntelliEditor', MB_YESNOCANCEL|MB_ICONQUESTION);
+            if (r == IDCANCEL) break;
+            if (r == IDYES) SendMessageA(hwnd, WM_COMMAND, ID_FILE_SAVE, 0);
+        }
+        editor_destroy(ctx->doc);
+        ctx->doc = editor_create();
+        ui_sync_text(ctx);
+        SetWindowTextA(hwnd, UI_WINDOW_TITLE ' — Nouveau document');
+        break;
+ 
+    case ID_FILE_OPEN: {
+        char path[MAX_PATH] = {0};
+        OPENFILENAMEA ofn = {0};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner   = hwnd;
+        ofn.lpstrFile   = path;
+        ofn.nMaxFile    = MAX_PATH;
+        ofn.lpstrFilter = 'Texte (*.txt)\0*.txt\0Tous (*.*)\0*.*\0';
+        ofn.Flags       = OFN_FILEMUSTEXIST;
+        if (GetOpenFileNameA(&ofn)) {
+            size_t len = 0;
+            char *content = storage_read_file(path, &len);
+            if (content) {
+                editor_destroy(ctx->doc);
+                ctx->doc = editor_create();
+                editor_insert(ctx->doc, content, len);
+                ctx->doc->dirty = false;
+                free(content);
+                ui_sync_text(ctx);
+            }
+        }
+        break;
+    }
+ 
+    case ID_EDIT_UNDO:
+        editor_undo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+ 
+    case ID_EDIT_REDO:
+        editor_redo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+    }
+    return 0;
+}
+static bool create_statusbar(AppContext *ctx) {
+    ctx->hwnd_statusbar = CreateWindowExA(
+        0, STATUSCLASSNAMEA, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0,
+        ctx->hwnd_main, NULL, ctx->hinstance, NULL
+    );
+    if (!ctx->hwnd_statusbar) return false;
+ 
+    int parts[4] = {200, 400, 550, -1};
+    SendMessageA(ctx->hwnd_statusbar, SB_SETPARTS, 4, (LPARAM)parts);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)'Mots: 0');
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)'UTF-8');
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)'Prêt');
+    return true;
+}
+
+
 
 /* ------------------------------------------------------------------------- */
 
 void ui_update_statusbar(AppContext *ctx, size_t words, int line, int col) {
     if (!ctx->hwnd_statusbar) return;
-
-    char buf[256];
-    sprintf(buf, "Mots: %zu", words);
+    char buf[64];
+    snprintf(buf, sizeof(buf), 'Mots: %zu', words);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)buf);
-
-    sprintf(buf, "Ligne %d, Col %d", line + 1, col + 1);  // 1-based
+    snprintf(buf, sizeof(buf), 'Ligne %d, Col %d', line+1, col+1);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)buf);
-
-    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"Prêt");
 }
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -306,19 +397,35 @@ void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
 
 void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
     if (!ctx->hwnd_rules_panel || !report) return;
-
-    // Vider la liste
+    /* Vider le panneau */
     SendMessageA(ctx->hwnd_rules_panel, LB_RESETCONTENT, 0, 0);
-
-    // Ajouter chaque résultat
+    /* Ajouter chaque résultat */
     for (size_t i = 0; i < report->result_count; i++) {
-        const RuleResult *res = &report->results[i];
-        char buf[512];
-        sprintf(buf, "%s : %s — %s",
-                res->rule_id,
-                rule_status_to_string(res->status),
-                res->message ? res->message : "");
-        SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)buf);
+        char line[300];
+        const char *icon =
+            report->results[i].status == STATUS_PASS    ? '[OK] ' :
+            report->results[i].status == STATUS_FAIL    ? '[KO] ' :
+            report->results[i].status == STATUS_PENDING ? '[..] ' : '[!!] ';
+        snprintf(line, sizeof(line), '%s%s — %s',
+                 icon,
+                 report->results[i].rule_id,
+                 report->results[i].message);
+        SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)line);
     }
+    /* Résumé */
+    char summary[128];
+    snprintf(summary, sizeof(summary), 'Conformite: %zu/%zu OK',
+             report->pass_count, report->result_count);
+    SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)summary);
 }
+case WM_LLM_RESPONSE: {
+    /* lp = pointeur vers une LlmResponse allouée par le thread LLM */
+    LlmResponse *resp = (LlmResponse *)lp;
+    if (!resp) break;
+    /* Afficher la réponse dans une boîte de dialogue */
+    MessageBoxA(hwnd, resp->text, 'Réponse LLM', MB_OK|MB_ICONINFORMATION);
+    free(resp); /* Libérer la mémoire */
+    return 0;
+}
+
    
