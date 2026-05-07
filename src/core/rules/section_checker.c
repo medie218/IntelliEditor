@@ -1,9 +1,10 @@
+#include <cjson/cJSON.h>
 /**
  * @file section_checker.c
  * @brief Vérificateur de sections — CORE / rules / checkers
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>

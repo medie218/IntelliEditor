@@ -3,7 +3,7 @@
  * @brief Parser JSON des fichiers de règles — ADAPTER / rules_json_cjson
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include "../../../include/storage.h"
 #include <stdlib.h>
 #include <string.h>
@@ -71,7 +71,7 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     /* category */
     cJSON *cat = cJSON_GetObjectItem(obj, "category");
     if (cJSON_IsString(cat))
-        strncpy(out->category, cat->valuestring, RULES_MAX_CATEGORY_LEN - 1);
+        strncpy(out->category, cat->valuestring, 32 - 1);
 
     /* check_type */
     cJSON *ctype = cJSON_GetObjectItem(obj, "check_type");
@@ -101,13 +101,13 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     cJSON *flags = cJSON_GetObjectItem(obj, "flags");
     if (flags && cJSON_IsObject(flags)) {
         cJSON *ci = cJSON_GetObjectItem(flags, "case_insensitive");
-        out->flags.case_insensitive = cJSON_IsBool(ci) ? cJSON_IsTrue(ci) : false;
+        out->case_insensitive = cJSON_IsBool(ci) ? cJSON_IsTrue(ci) : false;
     }
 
     /* target_section */
     cJSON *ts = cJSON_GetObjectItem(obj, "target_section");
     if (cJSON_IsString(ts))
-        strncpy(out->target_section, ts->valuestring, RULES_MAX_SECTION_LEN - 1);
+        strncpy(out->target_section, ts->valuestring, 64 - 1);
 }
 
 /* ============================================================================

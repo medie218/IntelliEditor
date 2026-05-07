@@ -4,7 +4,7 @@
  * RESPONSABLE : DEV-A
  */
 
-#include "../../include/storage.h"
+#include "storage.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -40,7 +40,7 @@
  *   Décommenter l'include Hunspell quand disponible via MSYS2.
  *   Installation : pacman -S mingw-w64-x86_64-hunspell
  */
-/* #include <hunspell/hunspell.h> */
+ #include <hunspell/hunspell.h>
 
 /* ============================================================================
  * STRUCTURE INTERNE
@@ -90,8 +90,14 @@ SpellChecker *spellchecker_create(const char *aff_path, const char *dic_path) {
      *   sc->loaded = true;
      */
 
-    fprintf(stderr, "[STUB] spellchecker_create: Hunspell non chargé (TODO-HUNSPELL-002)\n");
-    fprintf(stderr, "[INFO] Dictionnaires attendus: %s / %s\n", aff_path, dic_path);
+   sc->hunspell_handle = Hunspell_create(aff_path, dic_path);
+    if (!sc->hunspell_handle) {
+        fprintf(stderr, "[ERROR] Hunspell_create échoué pour: %s / %s\n", aff_path, dic_path);
+        free(sc);
+        return NULL;
+    }
+    sc->loaded = true;
+    printf("[INFO] Hunspell chargé avec succès: %s\n", dic_path);
 
     return sc;
 }
@@ -101,10 +107,7 @@ SpellChecker *spellchecker_create(const char *aff_path, const char *dic_path) {
  */
 void spellchecker_destroy(SpellChecker *sc) {
     if (!sc) return;
-    /*
-     * TODO [DEV-C / TODO-HUNSPELL-003] :
-     *   if (sc->hunspell_handle) Hunspell_destroy(sc->hunspell_handle);
-     */
+    if (sc->hunspell_handle) Hunspell_destroy(sc->hunspell_handle);
     free(sc);
 }
 
@@ -125,9 +128,8 @@ bool spellcheck_word(const SpellChecker *sc, const char *word) {
      * Si les dictionnaires sont en UTF-8, utiliser Hunspell_spell() directement.
      * Vérifier l'encodage du .aff avec : head -1 fr_FR.aff (ligne "SET UTF-8")
      */
-
-    (void)sc;
-    return true; /* STUB */
+int result = Hunspell_spell(sc->hunspell_handle, word);
+    return result != 0;
 }
 
 void spellcheck_suggest(const SpellChecker *sc,
@@ -142,17 +144,14 @@ void spellcheck_suggest(const SpellChecker *sc,
         return;
     }
 
-    /*
-     * TODO [DEV-C / TODO-HUNSPELL-005] :
-     *   char **hsuggestions = NULL;
-     *   int n = Hunspell_suggest(sc->hunspell_handle, &hsuggestions, word);
-     *   for (int i = 0; i < n && i < NLP_MAX_SUGGESTIONS; i++) {
-     *       strncpy(suggestions[i].word, hsuggestions[i], NLP_MAX_WORD_LEN - 1);
-     *       suggestions[i].confidence = 1.0f - (float)i / (float)n;
-     *   }
-     *   *count = (size_t)(n < NLP_MAX_SUGGESTIONS ? n : NLP_MAX_SUGGESTIONS);
-     *   Hunspell_free_list(sc->hunspell_handle, &hsuggestions, n);
-     */
+    char **hsuggestions = NULL;
+    int n = Hunspell_suggest(sc->hunspell_handle, &hsuggestions, word);
+    for (int i = 0; i < n && i < NLP_MAX_SUGGESTIONS; i++) {
+        strncpy(suggestions[i].word, hsuggestions[i], NLP_MAX_WORD_LEN - 1);
+        suggestions[i].confidence = 1.0f - (float)i / (float)n;
+    }
+    *count = (size_t)(n < NLP_MAX_SUGGESTIONS ? n : NLP_MAX_SUGGESTIONS);
+    Hunspell_free_list(sc->hunspell_handle, &hsuggestions, n);
 }
 
 void spellcheck_analyze(const SpellChecker *sc,
@@ -180,6 +179,45 @@ void spellcheck_analyze(const SpellChecker *sc,
      *   ATTENTION : ne pas signaler les nombres, URLs, emails comme erreurs
      */
 
-    (void)len; /* TODO : utiliser len comme borne de sécurité */
-    fprintf(stderr, "[STUB] spellcheck_analyze: TODO-HUNSPELL-006\n");
+   size_t i = 0;
+    char word[NLP_MAX_WORD_LEN];
+    size_t word_len = 0;
+    size_t word_start = 0;
+
+    while (i <= len) {
+        unsigned char c = (i < len) ? (unsigned char)text[i] : ' ';
+        bool is_sep = (c == ' ' || c == '\n' || c == '\r' ||
+                       c == '\t' || c == '.' || c == ',' ||
+                       c == '!' || c == '?' || c == ';' ||
+                       c == ':' || c == '"' || c == '(' ||
+                       c == ')');
+
+        if (!is_sep && word_len < NLP_MAX_WORD_LEN - 1) {
+            word[word_len++] = (char)c;
+        } else if (word_len > 0) {
+            word[word_len] = '\0';
+
+            if (!spellcheck_word(sc, word) &&
+                out->error_count < NLP_MAX_ERRORS) {
+
+                NlpError *err = &out->errors[out->error_count++];
+                err->type  = NLP_ERROR_SPELLING;
+                err->start = word_start;
+                err->length = word_len;
+                strncpy(err->original, word, NLP_MAX_WORD_LEN - 1);
+                snprintf(err->message, sizeof(err->message),
+                         "Mot inconnu : '%s'", word);
+
+                spellcheck_suggest(sc, word,
+                                   err->suggestions,
+                                   &err->suggestion_count);
+            }
+            word_len  = 0;
+            word_start = i + 1;
+        } else {
+            word_start = i + 1;
+        }
+        i++;
+    }
 }
+   
