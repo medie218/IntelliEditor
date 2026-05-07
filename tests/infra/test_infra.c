@@ -2,7 +2,29 @@
  * @file test_infra.c
  * @brief Tests unitaires des modules infra (encoding, config, storage) — cmocka
  *
- * RESPONSABLE : DEV-D (squelette), DEV-A (implémentation)
+ * =============================================================================
+ * RÔLE
+ * =============================================================================
+ * Ce fichier teste les modules INFRA :
+ *   - encoding  → gestion UTF-8, comptage de caractères
+ *   - config    → stockage clé/valeur en mémoire
+ *   - storage   → lecture/écriture de fichiers
+ *
+ * =============================================================================
+ * DEV-D (Ehud) — Notes d’architecture
+ * =============================================================================
+ * - Ce fichier sert de squelette pour DEV-A (implémentation infra).
+ * - Les tests décrivent le comportement attendu des modules infra.
+ * - Certains tests échoueront tant que DEV-A n’aura pas implémenté les TODO.
+ * - Les tests sont organisés par catégories :
+ *      1. Encoding
+ *      2. Config
+ *      3. Storage
+ *
+ * - Les tests sont progressifs :
+ *      → DEV-A active les tests au fur et à mesure.
+ *
+ * =============================================================================
  */
 
 #include <stdarg.h>
@@ -10,13 +32,12 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../include/encoding.h"
-#include "../include/config.h"
-#include "../include/storage.h"
+#include "../../../include/encoding.h"
+#include "../../../include/config.h"
+#include "../../../include/storage.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-
 
 /* ============================================================================
  * TESTS — ENCODING
@@ -25,31 +46,30 @@
 /**
  * @brief Test : encoding_utf8_char_count() compte correctement les caractères.
  *
- * "café" = 4 caractères Unicode mais 5 octets (é = 2 octets en UTF-8)
+ * ASCII : nombre de caractères = nombre d’octets.
  */
 static void test_encoding_utf8_char_count_ascii(void **state) {
     (void)state;
-    /* Texte ASCII pur : nombre de chars = nombre d'octets */
+
     assert_int_equal(encoding_utf8_char_count("Hello"), 5);
     assert_int_equal(encoding_utf8_char_count(""),      0);
     assert_int_equal(encoding_utf8_char_count("A"),     1);
 }
 
+/**
+ * @brief Test : encoding_utf8_char_count() gère correctement l’UTF-8.
+ *
+ * "café" = 4 caractères Unicode mais 5 octets.
+ *
+ * TODO [DEV-A] : Ce test doit passer après TODO-ENCODING-001.
+ */
 static void test_encoding_utf8_char_count_unicode(void **state) {
     (void)state;
-    /*
-     * "café" en UTF-8 : c(1) a(1) f(1) é(2) = 5 octets, 4 caractères
-     *
-     * TODO [DEV-A] : Ce test valide que encoding_utf8_char_count()
-     * compte les code points, pas les octets.
-     */
+
     const char *cafe = "caf\xC3\xA9"; /* "café" en UTF-8 */
     size_t chars = encoding_utf8_char_count(cafe);
 
-    /* strlen(cafe) = 5 octets */
     assert_int_equal(strlen(cafe), 5);
-
-    /* Mais en caractères Unicode : 4 */
     assert_int_equal(chars, 4);
 }
 
@@ -71,25 +91,20 @@ static void test_encoding_is_valid_utf8_valid(void **state) {
 
 static void test_encoding_is_valid_utf8_invalid(void **state) {
     (void)state;
-    /* Séquence invalide : octet de continuation sans octet de début */
+
     const char invalid[] = {0x80, 0x80, 0x00};
-    /*
-     * TODO [DEV-A] : Ce test doit retourner false après TODO-ENCODING-001.
-     * Pour l'instant le stub retourne toujours true.
-     */
+
+    /* TODO : activer après implémentation */
     /* assert_false(encoding_is_valid_utf8(invalid, 2)); */
-    printf("[TODO] test_encoding_is_valid_utf8_invalid: à activer après TODO-ENCODING-001\n");
+
+    printf("[TODO] test_encoding_is_valid_utf8_invalid: en attente de TODO-ENCODING-001\n");
     (void)invalid;
 }
-
 
 /* ============================================================================
  * TESTS — CONFIG
  * ============================================================================ */
 
-/**
- * @brief Test : config_set et config_get fonctionnent ensemble.
- */
 static void test_config_set_get(void **state) {
     (void)state;
 
@@ -103,9 +118,6 @@ static void test_config_set_get(void **state) {
     assert_string_equal(val, "dark");
 }
 
-/**
- * @brief Test : config_get retourne NULL pour une clé inexistante.
- */
 static void test_config_get_missing_key(void **state) {
     (void)state;
 
@@ -116,9 +128,6 @@ static void test_config_get_missing_key(void **state) {
     assert_null(val);
 }
 
-/**
- * @brief Test : config_set met à jour une valeur existante.
- */
 static void test_config_set_update(void **state) {
     (void)state;
 
@@ -126,12 +135,11 @@ static void test_config_set_update(void **state) {
     memset(&cfg, 0, sizeof(cfg));
 
     config_set(&cfg, "Editor", "font_size", "12");
-    config_set(&cfg, "Editor", "font_size", "16"); /* Mise à jour */
+    config_set(&cfg, "Editor", "font_size", "16");
 
     const char *val = config_get(&cfg, "Editor", "font_size");
     assert_string_equal(val, "16");
 
-    /* Ne doit pas créer de doublon */
     size_t count = 0;
     for (size_t i = 0; i < cfg.count; i++) {
         if (strcmp(cfg.entries[i].key, "font_size") == 0) count++;
@@ -139,9 +147,6 @@ static void test_config_set_update(void **state) {
     assert_int_equal(count, 1);
 }
 
-/**
- * @brief Test : config_get_int retourne la valeur par défaut si clé absente.
- */
 static void test_config_get_int_default(void **state) {
     (void)state;
 
@@ -152,9 +157,6 @@ static void test_config_get_int_default(void **state) {
     assert_int_equal(val, 4);
 }
 
-/**
- * @brief Test : config_get_int parse la valeur correctement.
- */
 static void test_config_get_int_parse(void **state) {
     (void)state;
 
@@ -163,19 +165,17 @@ static void test_config_get_int_parse(void **state) {
 
     config_set(&cfg, "LLM", "n_ctx", "4096");
     int val = config_get_int(&cfg, "LLM", "n_ctx", 2048);
+
     assert_int_equal(val, 4096);
 }
-
 
 /* ============================================================================
  * TESTS — STORAGE
  * ============================================================================ */
 
-/**
- * @brief Test : storage_detect_format() identifie les extensions.
- */
 static void test_storage_detect_format_txt(void **state) {
     (void)state;
+
     assert_int_equal(storage_detect_format("document.txt"), FILE_FORMAT_TXT);
     assert_int_equal(storage_detect_format("rapport.rtf"),  FILE_FORMAT_RTF);
     assert_int_equal(storage_detect_format("notes.ie"),     FILE_FORMAT_IE);
@@ -191,8 +191,8 @@ static void test_storage_detect_format_txt(void **state) {
 static void test_storage_write_read_txt(void **state) {
     (void)state;
 
-    const char *content  = "Contenu de test\nDeuxième ligne\n";
-    const char *tmpfile  = "test_storage_tmp.txt";
+    const char *content = "Contenu de test\nDeuxième ligne\n";
+    const char *tmpfile = "test_storage_tmp.txt";
 
     bool ok = storage_write_txt(tmpfile, content, strlen(content));
     assert_true(ok);
@@ -205,9 +205,8 @@ static void test_storage_write_read_txt(void **state) {
     assert_string_equal(read, content);
 
     free(read);
-    remove(tmpfile); /* Nettoyage */
+    remove(tmpfile);
 }
-
 
 /* ============================================================================
  * CONFIGURATION DES TESTS

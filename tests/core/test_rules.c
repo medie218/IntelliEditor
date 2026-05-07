@@ -2,12 +2,28 @@
  * @file test_rules.c
  * @brief Tests unitaires du moteur de règles — cmocka
  *
- * Ces tests vérifient :
- *   - La création et destruction des structures (RuleSet, RuleReport)
- *   - L'évaluation des règles sur des textes de démonstration
- *   - Les cas limites (texte vide, règle inconnue, etc.)
+ * =============================================================================
+ * RÔLE
+ * =============================================================================
+ * Ce fichier teste :
+ *   - La création/destruction des structures (RuleSet, RuleReport)
+ *   - L’évaluation des règles structurelles (sections, comptage)
+ *   - Le comportement des règles LLM (toujours STATUS_PENDING)
+ *   - La mise à jour des résultats LLM
  *
- * RESPONSABLE : DEV-D
+ * =============================================================================
+ * DEV-D (Ehud) — Notes d’architecture
+ * =============================================================================
+ * - Ce fichier sert de documentation vivante pour le moteur de règles.
+ * - Les tests sont organisés par catégories :
+ *      1. Cycle de vie
+ *      2. Évaluation
+ *      3. LLM
+ *      4. Utilitaires
+ *
+ * - Certains tests restent TODO tant que les checkers ne sont pas complets.
+ *
+ * =============================================================================
  */
 
 #include <stdarg.h>
@@ -15,21 +31,17 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../include/rules.h"
+#include "../../../include/rules.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-
 /* ============================================================================
- * HELPERS DE TEST
+ * HELPERS
  * ============================================================================ */
 
-/**
- * @brief Crée un RuleSet minimal avec une seule règle, pour les tests.
- */
 static RuleSet *create_test_ruleset_one_rule(CheckType type,
-                                              const char *param) {
+                                             const char *param) {
     RuleSet *set = ruleset_create();
     if (!set) return NULL;
 
@@ -43,7 +55,6 @@ static RuleSet *create_test_ruleset_one_rule(CheckType type,
 
     return set;
 }
-
 
 /* ============================================================================
  * TESTS — CYCLE DE VIE
@@ -59,7 +70,7 @@ static void test_ruleset_create_not_null(void **state) {
 
 static void test_ruleset_destroy_null_safe(void **state) {
     (void)state;
-    ruleset_destroy(NULL); /* Ne doit pas crasher */
+    ruleset_destroy(NULL);
 }
 
 static void test_rulereport_create_not_null(void **state) {
@@ -72,68 +83,43 @@ static void test_rulereport_create_not_null(void **state) {
     rulereport_destroy(r);
 }
 
-
 /* ============================================================================
- * TESTS — ÉVALUATION DE RÈGLES
+ * TESTS — ÉVALUATION
  * ============================================================================ */
 
-/**
- * @brief Test : rules_evaluate() sur texte NULL retourne NULL sans crash.
- */
 static void test_rules_evaluate_null_text(void **state) {
     (void)state;
     RuleSet *set = ruleset_create();
-    if (!set) skip();
-
     RuleReport *report = rules_evaluate(set, NULL, 0);
-    assert_null(report); /* Doit retourner NULL sur entrée invalide */
-
+    assert_null(report);
     ruleset_destroy(set);
 }
 
-/**
- * @brief Test : rules_evaluate() sur RuleSet vide produit un rapport vide.
- */
 static void test_rules_evaluate_empty_ruleset(void **state) {
     (void)state;
     RuleSet *set = ruleset_create();
-    if (!set) skip();
-
     const char *text = "Texte de test";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
-
     assert_non_null(report);
     assert_int_equal(report->result_count, 0);
-
     rulereport_destroy(report);
     ruleset_destroy(set);
 }
 
 /**
  * @brief Test : CHECK_SECTION_EXISTS → PASS quand la section est présente.
- *
- * TODO [DEV-D] : Doit passer après TODO-SECTION-003.
  */
 static void test_check_section_exists_found(void **state) {
     (void)state;
 
-    RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "Introduction");
-    if (!set) skip();
+    RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "INTRODUCTION");
+    const char *text = "INTRODUCTION\n\nContenu...\n";
 
-    /* Texte qui CONTIENT la section "Introduction" */
-    const char *text = "INTRODUCTION\n\nCe document présente notre recherche.\n";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
     assert_int_equal(report->result_count, 1);
-
-    /*
-     * TODO [DEV-D] : Ce test échoue jusqu'à implémentation du checker.
-     * Il doit retourner STATUS_PASS quand "Introduction" est dans le texte.
-     */
-    /* assert_int_equal(report->results[0].status, STATUS_PASS); */
-
-    printf("[TODO] test_check_section_exists_found: à activer après TODO-SECTION-003\n");
+    assert_int_equal(report->results[0].status, STATUS_PASS);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
@@ -141,34 +127,26 @@ static void test_check_section_exists_found(void **state) {
 
 /**
  * @brief Test : CHECK_SECTION_EXISTS → FAIL quand la section est absente.
- *
- * TODO [DEV-D] : Doit passer après TODO-SECTION-003.
  */
 static void test_check_section_exists_not_found(void **state) {
     (void)state;
 
     RuleSet *set = create_test_ruleset_one_rule(CHECK_SECTION_EXISTS, "Conclusion");
-    if (!set) skip();
+    const char *text = "INTRODUCTION\n\nContenu...\n";
 
-    /* Texte qui NE CONTIENT PAS "Conclusion" */
-    const char *text = "INTRODUCTION\n\nVoici le début du document.";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
-    /* assert_int_equal(report->results[0].status, STATUS_FAIL); */
-
-    printf("[TODO] test_check_section_exists_not_found: à activer après TODO-SECTION-003\n");
+    assert_int_equal(report->results[0].status, STATUS_FAIL);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
 }
 
-/**
- * @brief Test : CHECK_LLM_SEMANTIC → STATUS_PENDING (toujours).
- *
- * Les règles LLM ne sont pas évaluées synchronement.
- * Elles doivent toujours retourner STATUS_PENDING.
- */
+/* ============================================================================
+ * TESTS — RÈGLES LLM
+ * ============================================================================ */
+
 static void test_check_llm_semantic_always_pending(void **state) {
     (void)state;
 
@@ -176,9 +154,8 @@ static void test_check_llm_semantic_always_pending(void **state) {
         CHECK_LLM_SEMANTIC,
         "La problématique est-elle posée ?"
     );
-    if (!set) skip();
 
-    const char *text = "Une recherche sur l'impact de l'IA sur la société.";
+    const char *text = "Une recherche sur l'impact de l'IA.";
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
@@ -190,26 +167,19 @@ static void test_check_llm_semantic_always_pending(void **state) {
     ruleset_destroy(set);
 }
 
-
 /* ============================================================================
  * TESTS — MISE À JOUR DES RÉSULTATS LLM
  * ============================================================================ */
 
-/**
- * @brief Test : rules_update_llm_result() met à jour un STATUS_PENDING.
- */
 static void test_rules_update_llm_result_valid(void **state) {
     (void)state;
 
     RuleSet *set = create_test_ruleset_one_rule(CHECK_LLM_SEMANTIC, "Question?");
-    if (!set) skip();
-
     const char *text = "Texte de test.";
-    RuleReport *report = rules_evaluate(set, text, strlen(text));
-    if (!report) { ruleset_destroy(set); skip(); }
 
-    /* Simuler la réponse du thread LLM */
-    rules_update_llm_result(report, "T001", STATUS_PASS, "Problématique bien posée.");
+    RuleReport *report = rules_evaluate(set, text, strlen(text));
+
+    rules_update_llm_result(report, "T001", STATUS_PASS, "OK");
 
     assert_int_equal(report->results[0].status, STATUS_PASS);
     assert_int_equal(report->pending_count, 0);
@@ -219,21 +189,13 @@ static void test_rules_update_llm_result_valid(void **state) {
     ruleset_destroy(set);
 }
 
-/**
- * @brief Test : rules_update_llm_result() avec ID inexistant ne crash pas.
- */
 static void test_rules_update_llm_result_unknown_id(void **state) {
     (void)state;
 
     RuleReport *report = rulereport_create();
-    if (!report) skip();
-
-    /* Ne doit pas crasher */
     rules_update_llm_result(report, "INEXISTANT", STATUS_PASS, NULL);
-
     rulereport_destroy(report);
 }
-
 
 /* ============================================================================
  * TESTS — UTILITAIRES
@@ -248,7 +210,6 @@ static void test_check_type_to_string_known(void **state) {
 
 static void test_rule_status_to_string_all(void **state) {
     (void)state;
-    /* Vérifier que toutes les valeurs d'enum ont une chaîne associée */
     assert_non_null(rule_status_to_string(STATUS_PASS));
     assert_non_null(rule_status_to_string(STATUS_FAIL));
     assert_non_null(rule_status_to_string(STATUS_WARNING));
@@ -257,9 +218,8 @@ static void test_rule_status_to_string_all(void **state) {
     assert_non_null(rule_status_to_string(STATUS_SKIPPED));
 }
 
-
 /* ============================================================================
- * CONFIGURATION DES TESTS
+ * MAIN
  * ============================================================================ */
 
 int main(void) {
