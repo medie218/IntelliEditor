@@ -29,7 +29,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../include/editor.h"
+#include "../../include/editor.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

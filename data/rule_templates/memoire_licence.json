@@ -46,7 +46,7 @@
       "description": "Éviter l'emploi de la première personne du singulier",
       "check_type": "regex_forbidden",
       "parameter": "\\bje\\b|\\bj'|\\bme\\b|\\bmon\\b|\\bma\\b|\\bmes\\b",
-      "flags": "case_insensitive"
+      "flags": {"case_insensitive": true}
     },
     {
       "id": "R005",
