@@ -264,6 +264,61 @@ static bool create_toolbar(AppContext *ctx) {
 
     return true;
 }
+case WM_COMMAND: {
+    int id = LOWORD(wp);
+    switch(id) {
+ 
+    case ID_FILE_NEW:
+        if (ctx->doc->dirty) {
+            int r = MessageBoxA(hwnd,
+                'Sauvegarder avant de créer un nouveau document ?',
+                'IntelliEditor', MB_YESNOCANCEL|MB_ICONQUESTION);
+            if (r == IDCANCEL) break;
+            if (r == IDYES) SendMessageA(hwnd, WM_COMMAND, ID_FILE_SAVE, 0);
+        }
+        editor_destroy(ctx->doc);
+        ctx->doc = editor_create();
+        ui_sync_text(ctx);
+        SetWindowTextA(hwnd, UI_WINDOW_TITLE ' — Nouveau document');
+        break;
+ 
+    case ID_FILE_OPEN: {
+        char path[MAX_PATH] = {0};
+        OPENFILENAMEA ofn = {0};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner   = hwnd;
+        ofn.lpstrFile   = path;
+        ofn.nMaxFile    = MAX_PATH;
+        ofn.lpstrFilter = 'Texte (*.txt)\0*.txt\0Tous (*.*)\0*.*\0';
+        ofn.Flags       = OFN_FILEMUSTEXIST;
+        if (GetOpenFileNameA(&ofn)) {
+            size_t len = 0;
+            char *content = storage_read_file(path, &len);
+            if (content) {
+                editor_destroy(ctx->doc);
+                ctx->doc = editor_create();
+                editor_insert(ctx->doc, content, len);
+                ctx->doc->dirty = false;
+                free(content);
+                ui_sync_text(ctx);
+            }
+        }
+        break;
+    }
+ 
+    case ID_EDIT_UNDO:
+        editor_undo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+ 
+    case ID_EDIT_REDO:
+        editor_redo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+    }
+    return 0;
+}
+
 
 /* ------------------------------------------------------------------------- */
 
