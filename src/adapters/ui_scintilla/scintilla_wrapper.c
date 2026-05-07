@@ -115,6 +115,23 @@ new_ctx->hwnd_scintilla = scintilla_create(
     rc.right - panel_w,             /* largeur */
     rc.bottom - 30 - 20             /* hauteur - toolbar - statusbar */
 );
+void ui_sync_text(AppContext *ctx) {
+    if (!ctx || !ctx->doc || !ctx->hwnd_scintilla) return;
+ 
+    char *text = editor_get_text(ctx->doc);
+    if (!text) return;
+ 
+    /* Envoyer le texte à Scintilla */
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
+    free(text);
+ 
+    /* Mettre à jour la barre de statut */
+    DocStats stats;
+    editor_compute_stats(ctx->doc, &stats);
+    ui_update_statusbar(ctx, stats.word_count, 0, 0);
+}
+
+
 
 /**
  * @brief Envoie un texte UTF-8 vers Scintilla.
@@ -136,6 +153,25 @@ char *scintilla_get_text(HWND hwnd_sci) {
 
     SendMessageA(hwnd_sci, SCI_GETTEXT, (WPARAM)(len + 1), (LPARAM)buf);
     return buf;
+}
+void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
+    if (!ctx->hwnd_scintilla || !result) return;
+    HWND sci = ctx->hwnd_scintilla;
+ 
+    /* Effacer les anciens marqueurs */
+    SendMessageA(sci, SCI_SETINDICATORCURRENT, 0, 0);
+    SendMessageA(sci, SCI_INDICATORCLEARRANGE, 0,
+        SendMessageA(sci, SCI_GETLENGTH, 0, 0));
+ 
+    /* Appliquer les nouveaux marqueurs */
+    for (size_t i = 0; i < result->error_count; i++) {
+        const NlpError *err = &result->errors[i];
+        /* Choisir l'indicateur selon le type d'erreur */
+        int indicator = (err->type == NLP_ERROR_SPELLING) ? 0 : 1;
+        SendMessageA(sci, SCI_SETINDICATORCURRENT, indicator, 0);
+        SendMessageA(sci, SCI_INDICATORFILLRANGE,
+            (WPARAM)err->start, (LPARAM)err->length);
+    }
 }
 
 /**

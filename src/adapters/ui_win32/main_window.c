@@ -418,5 +418,14 @@ void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
              report->pass_count, report->result_count);
     SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)summary);
 }
+case WM_LLM_RESPONSE: {
+    /* lp = pointeur vers une LlmResponse allouée par le thread LLM */
+    LlmResponse *resp = (LlmResponse *)lp;
+    if (!resp) break;
+    /* Afficher la réponse dans une boîte de dialogue */
+    MessageBoxA(hwnd, resp->text, 'Réponse LLM', MB_OK|MB_ICONINFORMATION);
+    free(resp); /* Libérer la mémoire */
+    return 0;
+}
 
    
