@@ -195,6 +195,28 @@ static bool create_menu(HWND hwnd) {
     SetMenu(hwnd, bar);
     return true;
 }
+case WM_SIZE: {
+    if (!ctx) break;
+    RECT rc; GetClientRect(hwnd, &rc);
+    int W = rc.right; int H = rc.bottom;
+    int toolbar_h = 30; int status_h = 20;
+    int panel_w   = UI_RULES_PANEL_W;
+    int edit_w    = W - panel_w;
+    int edit_h    = H - toolbar_h - status_h;
+ 
+    /* Redimensionner Scintilla */
+    if (ctx->hwnd_scintilla)
+        MoveWindow(ctx->hwnd_scintilla, 0, toolbar_h, edit_w, edit_h, TRUE);
+ 
+    /* Redimensionner le panneau règles */
+    if (ctx->hwnd_rules_panel)
+        MoveWindow(ctx->hwnd_rules_panel, edit_w, toolbar_h, panel_w, edit_h, TRUE);
+ 
+    /* Redimensionner la barre de statut */
+    if (ctx->hwnd_statusbar)
+        SendMessageA(ctx->hwnd_statusbar, WM_SIZE, 0, 0);
+    return 0;
+}
 
 
 static bool create_statusbar(AppContext *ctx) {
