@@ -318,22 +318,36 @@ case WM_COMMAND: {
     }
     return 0;
 }
+static bool create_statusbar(AppContext *ctx) {
+    ctx->hwnd_statusbar = CreateWindowExA(
+        0, STATUSCLASSNAMEA, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0,
+        ctx->hwnd_main, NULL, ctx->hinstance, NULL
+    );
+    if (!ctx->hwnd_statusbar) return false;
+ 
+    int parts[4] = {200, 400, 550, -1};
+    SendMessageA(ctx->hwnd_statusbar, SB_SETPARTS, 4, (LPARAM)parts);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)'Mots: 0');
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)'UTF-8');
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)'Prêt');
+    return true;
+}
+
 
 
 /* ------------------------------------------------------------------------- */
 
 void ui_update_statusbar(AppContext *ctx, size_t words, int line, int col) {
     if (!ctx->hwnd_statusbar) return;
-
-    char buf[256];
-    sprintf(buf, "Mots: %zu", words);
+    char buf[64];
+    snprintf(buf, sizeof(buf), 'Mots: %zu', words);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)buf);
-
-    sprintf(buf, "Ligne %d, Col %d", line + 1, col + 1);  // 1-based
+    snprintf(buf, sizeof(buf), 'Ligne %d, Col %d', line+1, col+1);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)buf);
-
-    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"Prêt");
 }
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -383,19 +397,26 @@ void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
 
 void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
     if (!ctx->hwnd_rules_panel || !report) return;
-
-    // Vider la liste
+    /* Vider le panneau */
     SendMessageA(ctx->hwnd_rules_panel, LB_RESETCONTENT, 0, 0);
-
-    // Ajouter chaque résultat
+    /* Ajouter chaque résultat */
     for (size_t i = 0; i < report->result_count; i++) {
-        const RuleResult *res = &report->results[i];
-        char buf[512];
-        sprintf(buf, "%s : %s — %s",
-                res->rule_id,
-                rule_status_to_string(res->status),
-                res->message ? res->message : "");
-        SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)buf);
+        char line[300];
+        const char *icon =
+            report->results[i].status == STATUS_PASS    ? '[OK] ' :
+            report->results[i].status == STATUS_FAIL    ? '[KO] ' :
+            report->results[i].status == STATUS_PENDING ? '[..] ' : '[!!] ';
+        snprintf(line, sizeof(line), '%s%s — %s',
+                 icon,
+                 report->results[i].rule_id,
+                 report->results[i].message);
+        SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)line);
     }
+    /* Résumé */
+    char summary[128];
+    snprintf(summary, sizeof(summary), 'Conformite: %zu/%zu OK',
+             report->pass_count, report->result_count);
+    SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)summary);
 }
+
    
