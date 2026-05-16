@@ -1,6 +1,6 @@
-#include "../../../include/ui.h"
-#include "../../../include/editor.h"
-#include "../../../include/config.h"
+#include "ui.h"
+#include "editor.h"
+#include "config.h"
 
 #include <commctrl.h>
 #include <stdbool.h>
@@ -8,8 +8,8 @@
 #include <shlobj.h>
 #include <process.h>
 #include <stdio.h>
-#include "../../../include/Scintilla.h"
-#include "../../../include/SciLexer.h"
+#include "Scintilla.h"
+#include "SciLexer.h"
 
 // Déclaration externe pour le wrapper Scintilla
 extern bool scintilla_load(void);

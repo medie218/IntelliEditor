@@ -22,8 +22,8 @@
  * ================================================================
  */
 
-#include "../../../include/nlp.h"
-#include "../../../include/llm.h"
+#include "nlp.h"
+#include "llm.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

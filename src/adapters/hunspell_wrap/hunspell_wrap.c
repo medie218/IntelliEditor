@@ -29,7 +29,7 @@
  * =============================================================================
  */
 
-#include "../../../include/nlp.h"
+#include "nlp.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -40,7 +40,9 @@
  *   Décommenter l'include Hunspell quand disponible via MSYS2.
  *   Installation : pacman -S mingw-w64-x86_64-hunspell
  */
- #include <hunspell/hunspell.h>
+ #ifdef HAVE_HUNSPELL
+#include <hunspell/hunspell.h>
+#endif
 
 /* ============================================================================
  * STRUCTURE INTERNE
@@ -79,7 +81,9 @@ SpellChecker *spellchecker_create(const char *aff_path, const char *dic_path) {
     if (!sc) return NULL;
 
     strncpy(sc->aff_path, aff_path ? aff_path : "", 511);
+    sc->aff_path[511] = '\0';
     strncpy(sc->dic_path, dic_path ? dic_path : "", 511);
+    sc->dic_path[511] = '\0';
     sc->loaded = false;
     sc->hunspell_handle = NULL;
 
@@ -148,6 +152,7 @@ void spellcheck_suggest(const SpellChecker *sc,
     int n = Hunspell_suggest(sc->hunspell_handle, &hsuggestions, word);
     for (int i = 0; i < n && i < NLP_MAX_SUGGESTIONS; i++) {
         strncpy(suggestions[i].word, hsuggestions[i], NLP_MAX_WORD_LEN - 1);
+        suggestions[i].word[NLP_MAX_WORD_LEN - 1] = '\0';
         suggestions[i].confidence = 1.0f - (float)i / (float)n;
     }
     *count = (size_t)(n < NLP_MAX_SUGGESTIONS ? n : NLP_MAX_SUGGESTIONS);
@@ -205,6 +210,7 @@ void spellcheck_analyze(const SpellChecker *sc,
                 err->start = word_start;
                 err->length = word_len;
                 strncpy(err->original, word, NLP_MAX_WORD_LEN - 1);
+                err->original[NLP_MAX_WORD_LEN - 1] = '\0';
                 snprintf(err->message, sizeof(err->message),
                          "Mot inconnu : '%s'", word);
 

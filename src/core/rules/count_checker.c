@@ -3,7 +3,7 @@
  * @brief Vérificateur de comptage de mots — CORE / rules / checkers
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -163,6 +163,7 @@ static void parse_min_rule(const char *json, char *section_out, int *min_words) 
                 while (*s && *s != '"') s++;
                 size_t len = s - start;
                 strncpy(section_out, start, len);
+                section_out[len] = '\0';
                 section_out[len] = 0;
             }
         }
@@ -191,6 +192,7 @@ static void parse_max_rule(const char *json, char *section_out, int *max_words) 
                 while (*s && *s != '"') s++;
                 size_t len = s - start;
                 strncpy(section_out, start, len);
+                section_out[len] = '\0';
                 section_out[len] = 0;
             }
         }
@@ -210,6 +212,7 @@ static void parse_max_rule(const char *json, char *section_out, int *max_words) 
 RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     char section[128];
     int min_words = 0;
@@ -263,6 +266,7 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
 RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     char section[128];
     int max_words = 0;
@@ -275,4 +279,5 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
                  "Paramètre invalide pour word_count_max");
         return result;
     }
+
 

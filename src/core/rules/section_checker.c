@@ -1,4 +1,6 @@
+#ifdef HAVE_CJSON
 #include <cjson/cJSON.h>
+#endif
 /**
  * @file section_checker.c
  * @brief Vérificateur de sections — CORE / rules / checkers
@@ -90,6 +92,7 @@ static size_t find_section(const char *text, const char *section_name) {
 RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     (void)len;
 
@@ -117,6 +120,7 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
 RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     (void)len;
 
@@ -182,6 +186,7 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
 RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     (void)len;
 
@@ -238,3 +243,4 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
              "Format des titres correct");
     return result;
 }
+

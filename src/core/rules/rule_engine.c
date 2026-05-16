@@ -80,6 +80,7 @@ static RuleResult evaluate_single_rule(const Rule *rule,
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     printf("[DEBUG] Évaluation règle %s (type=%s)\n",
            rule->id,
@@ -217,6 +218,7 @@ void rules_update_llm_result(RuleReport *report,
             report->results[i].status = status;
             if (message) {
                 strncpy(report->results[i].message, message, 255);
+                report->results[i].message[255] = '\0';
             }
             if (status == STATUS_PASS)    report->pass_count++;
             if (status == STATUS_FAIL)    report->fail_count++;
@@ -259,3 +261,4 @@ const char *rule_status_to_string(RuleStatus status) {
         default:             return "?";
     }
 }
+

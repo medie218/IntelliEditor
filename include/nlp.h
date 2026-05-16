@@ -158,7 +158,6 @@ void spellcheck_analyze(const SpellChecker *sc,
  * Les analyses LLM sont séparées (asynchrones, voir llm.h).
  */
 typedef struct NlpEngine NlpEngine;
-
 /**
  * @brief Implémentation concrète du moteur NLP.
  * Regroupe Hunspell + pipeline d'analyse.

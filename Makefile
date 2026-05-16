@@ -114,7 +114,7 @@ all: dirs $(TARGET)
 $(TARGET): $(OBJS_LIB) $(OBJ_MAIN)
 	@echo "[LINK] $@"
 	$(CC) $(CFLAGS) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
-	@echo "✅ Build terminé : $@"
+	@echo " Build terminé : $@"
 
 ## Compiler un fichier objet
 $(BUILD_DIR)/%.o: %.c

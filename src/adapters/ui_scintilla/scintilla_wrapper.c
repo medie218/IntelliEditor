@@ -36,7 +36,7 @@
  * =============================================================================
  */
 
-#include "../../../include/ui.h"
+#include "ui.h"
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -181,3 +181,4 @@ void scintilla_goto_pos(HWND hwnd_sci, size_t pos) {
     if (!hwnd_sci) return;
     SendMessageA(hwnd_sci, SCI_GOTOPOS, (WPARAM)pos, 0);
 }
+
