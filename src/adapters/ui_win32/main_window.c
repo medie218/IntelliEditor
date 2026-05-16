@@ -38,7 +38,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev,
     /* Créer le document Core */
     ctx.doc = editor_create();
     if (!ctx.doc) {
-        MessageBoxA(NULL, 'Mémoire insuffisante', 'Erreur', MB_ICONERROR);
+        MessageBoxA(NULL, "Mémoire insuffisante", "Erreur", MB_ICONERROR);
         return 1;
     }
  
@@ -181,17 +181,17 @@ static bool create_menu(HWND hwnd) {
     HMENU mFile = CreatePopupMenu();
     HMENU mEdit = CreatePopupMenu();
     HMENU mTools= CreatePopupMenu();
-    AppendMenuA(mFile, MF_STRING, ID_FILE_NEW,  'Nouveau\tCtrl+N');
-    AppendMenuA(mFile, MF_STRING, ID_FILE_OPEN, 'Ouvrir...\tCtrl+O');
-    AppendMenuA(mFile, MF_STRING, ID_FILE_SAVE, 'Enregistrer\tCtrl+S');
+    AppendMenuA(mFile, MF_STRING, ID_FILE_NEW, "Nouveau\tCtrl+N");
+    AppendMenuA(mFile, MF_STRING, ID_FILE_OPEN, "Ouvrir...\tCtrl+O");
+    AppendMenuA(mFile, MF_STRING, ID_FILE_SAVE, "Enregistrer\tCtrl+S");
     AppendMenuA(mFile, MF_SEPARATOR, 0, NULL);
-    AppendMenuA(mFile, MF_STRING, ID_FILE_EXIT, 'Quitter\tAlt+F4');
-    AppendMenuA(mEdit, MF_STRING, ID_EDIT_UNDO, 'Annuler\tCtrl+Z');
-    AppendMenuA(mEdit, MF_STRING, ID_EDIT_REDO, 'Rétablir\tCtrl+Y');
-    AppendMenuA(mTools,MF_STRING, ID_TOOLS_RULES_LOAD, 'Charger règles...');
-    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mFile,  'Fichier');
-    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mEdit,  'Edition');
-    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mTools, 'Outils');
+    AppendMenuA(mFile, MF_STRING, ID_FILE_EXIT, "Quitter\tAlt+F4");
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_UNDO, "Annuler\tCtrl+Z");
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_REDO, "Rétablir\tCtrl+Y");
+    AppendMenuA(mTools,MF_STRING, ID_TOOLS_RULES_LOAD, "Charger règles...");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mFile, "Fichier");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mEdit, "Edition");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mTools, "Outils");
     SetMenu(hwnd, bar);
     return true;
 }
@@ -253,7 +253,7 @@ static bool create_toolbar(AppContext *ctx) {
         {STD_FILESAVE, ID_FILE_SAVE, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Sauvegarder"},
         {0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0},  // Séparateur
         {STD_UNDO, ID_EDIT_UNDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Annuler"},
-        {STD_REDO, ID_EDIT_REDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Rétablir"},
+        {STD_REDOW, ID_EDIT_REDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Rétablir"},
     };
 
     // Ajouter les boutons
@@ -270,16 +270,14 @@ case WM_COMMAND: {
  
     case ID_FILE_NEW:
         if (ctx->doc->dirty) {
-            int r = MessageBoxA(hwnd,
-                'Sauvegarder avant de créer un nouveau document ?',
-                'IntelliEditor', MB_YESNOCANCEL|MB_ICONQUESTION);
+            int r = MessageBoxA(hwnd, "Sauvegarder avant de créer un nouveau document ?", "IntelliEditor", MB_YESNOCANCEL|MB_ICONQUESTION);
             if (r == IDCANCEL) break;
             if (r == IDYES) SendMessageA(hwnd, WM_COMMAND, ID_FILE_SAVE, 0);
         }
         editor_destroy(ctx->doc);
         ctx->doc = editor_create();
         ui_sync_text(ctx);
-        SetWindowTextA(hwnd, UI_WINDOW_TITLE ' — Nouveau document');
+        SetWindowTextA(hwnd, UI_WINDOW_TITLE " — Nouveau document");
         break;
  
     case ID_FILE_OPEN: {
@@ -289,7 +287,7 @@ case WM_COMMAND: {
         ofn.hwndOwner   = hwnd;
         ofn.lpstrFile   = path;
         ofn.nMaxFile    = MAX_PATH;
-        ofn.lpstrFilter = 'Texte (*.txt)\0*.txt\0Tous (*.*)\0*.*\0';
+        ofn.lpstrFilter = "Texte (*.txt)\0*.txt\0Tous (*.*)\0*.*\0";
         ofn.Flags       = OFN_FILEMUSTEXIST;
         if (GetOpenFileNameA(&ofn)) {
             size_t len = 0;
@@ -329,9 +327,9 @@ static bool create_statusbar(AppContext *ctx) {
  
     int parts[4] = {200, 400, 550, -1};
     SendMessageA(ctx->hwnd_statusbar, SB_SETPARTS, 4, (LPARAM)parts);
-    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)'Mots: 0');
-    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)'UTF-8');
-    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)'Prêt');
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)"Mots: 0");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"UTF-8");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)"Prêt");
     return true;
 }
 
@@ -342,9 +340,9 @@ static bool create_statusbar(AppContext *ctx) {
 void ui_update_statusbar(AppContext *ctx, size_t words, int line, int col) {
     if (!ctx->hwnd_statusbar) return;
     char buf[64];
-    snprintf(buf, sizeof(buf), 'Mots: %zu', words);
+    snprintf(buf, sizeof(buf), "Mots: %zu", words);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)buf);
-    snprintf(buf, sizeof(buf), 'Ligne %d, Col %d', line+1, col+1);
+    snprintf(buf, sizeof(buf), "Ligne %d, Col %d", line+1, col+1);
     SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)buf);
 }
 
@@ -403,10 +401,10 @@ void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
     for (size_t i = 0; i < report->result_count; i++) {
         char line[300];
         const char *icon =
-            report->results[i].status == RULE_STATUS_PASS    ? '[OK] ' :
-            report->results[i].status == RULE_STATUS_FAIL    ? '[KO] ' :
-            report->results[i].status == RULE_STATUS_PENDING ? '[..] ' : '[!!] ';
-        snprintf(line, sizeof(line), '%s%s — %s',
+            report->results[i].status == RULE_STATUS_PASS    ? "[OK] " :
+            report->results[i].status == RULE_STATUS_FAIL    ? "[KO] " :
+            report->results[i].status == RULE_STATUS_PENDING ? "[..] " : "[!!] ";
+        snprintf(line, sizeof(line), "%s%s — %s",
                  icon,
                  report->results[i].rule_id,
                  report->results[i].message);
@@ -414,7 +412,7 @@ void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
     }
     /* Résumé */
     char summary[128];
-    snprintf(summary, sizeof(summary), 'Conformite: %zu/%zu OK',
+    snprintf(summary, sizeof(summary), "Conformite: %zu/%zu OK",
              report->pass_count, report->result_count);
     SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)summary);
 }
@@ -423,7 +421,7 @@ case WM_LLM_RESPONSE: {
     LlmResponse *resp = (LlmResponse *)lp;
     if (!resp) break;
     /* Afficher la réponse dans une boîte de dialogue */
-    MessageBoxA(hwnd, resp->text, 'Réponse LLM', MB_OK|MB_ICONINFORMATION);
+    MessageBoxA(hwnd, resp->text, "Réponse LLM", MB_OK|MB_ICONINFORMATION);
     free(resp); /* Libérer la mémoire */
     return 0;
 }
