@@ -29,9 +29,11 @@
 CC      = gcc
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -Wno-unused-parameter
 CFLAGS += -Iinclude
-EXTRA_INCLUDES ?=
-CFLAGS += $(EXTRA_INCLUDES)
 CFLAGS += -g  # Symboles de debug (à retirer en release avec -O2)
+
+# Chemins d'inclusion supplémentaires (optionnel, à passer en ligne de commande)
+# Exemple : make EXTRA_INCLUDES=-Iscintilla/include test
+EXTRA_INCLUDES ?=
 
 # Flags Windows (nécessaires pour l'API Win32)
 # -DUNICODE et -D_UNICODE permettent d'utiliser les versions Wide des API Win32
@@ -115,14 +117,14 @@ all: dirs $(TARGET)
 
 $(TARGET): $(OBJS_LIB) $(OBJ_MAIN)
 	@echo "[LINK] $@"
-	$(CC) $(CFLAGS) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
+	$(CC) $(CFLAGS) $(EXTRA_INCLUDES) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
 	@echo " Build terminé : $@"
 
 ## Compiler un fichier objet
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "[CC]   $<"
-	$(CC) $(CFLAGS) $(WFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(EXTRA_INCLUDES) $(WFLAGS) -c -o $@ $<
 
 ## Créer les répertoires nécessaires
 dirs:
@@ -135,7 +137,7 @@ dirs:
 # -----------------------------------------------------------------------------
 
 TEST_SRCS  = $(wildcard tests/core/*.c) $(wildcard tests/adapters/*.c) $(wildcard tests/infra/*.c) $(wildcard tests/*.c)
-TEST_FLAGS = $(CFLAGS)
+TEST_FLAGS = $(CFLAGS) $(EXTRA_INCLUDES)
 TEST_LIBS  = -lcmocka $(LIBS)
 
 ## Compiler et lancer tous les tests
