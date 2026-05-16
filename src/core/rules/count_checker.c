@@ -281,3 +281,29 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     }
 
 
+
+    /* Logique principale manquante - compter les mots et vérifier */
+    size_t word_count = 0;
+    const char *p = text;
+    bool in_word = false;
+    while (*p) {
+        if (*p == ' ' || *p == '\n' || *p == '\t') {
+            in_word = false;
+        } else {
+            if (!in_word) word_count++;
+            in_word = true;
+        }
+        p++;
+    }
+
+    if (word_count > (size_t)max_words) {
+        result.status = STATUS_FAIL;
+        snprintf(result.message, sizeof(result.message),
+                 "Trop de mots : %zu > %d", word_count, max_words);
+    } else {
+        result.status = STATUS_PASS;
+        snprintf(result.message, sizeof(result.message),
+                 "Nombre de mots OK : %zu <= %d", word_count, max_words);
+    }
+    return result;
+}
