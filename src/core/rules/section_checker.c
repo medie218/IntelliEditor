@@ -1,5 +1,7 @@
 #ifdef HAVE_CJSON
+#ifdef HAVE_CJSON
 #include <cjson/cJSON.h>
+#endif /* HAVE_CJSON */
 #endif
 /**
  * @file section_checker.c
@@ -8,18 +10,16 @@
  * RESPONSABLE : DEV-D
  */
 
-<<<<<<< HEAD
 #include "rules.h"
 #include <string.h>
-=======
-#include "../../../include/rules.h"
->>>>>>> aa759bb (feat(dev-D):Finalisation des vérificateurs du moteur de règles, corrections de sécurité mémoire, nettoyage JSON, prêt pour l'intégration)
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 
+#ifdef HAVE_CJSON
 #include <cjson/cJSON.h>   /* IMPORTANT : nécessaire pour parser rule->parameter */
+#endif /* HAVE_CJSON */
 
 /* ============================================================================
  * find_section() — recherche insensible à la casse
@@ -41,7 +41,7 @@ size_t find_section(const char *text, const char *section_name) {
         if (!end) end = line + strlen(line);
 
         size_t line_len = end - line;
-        /* Recherche sans limite de 255 caract�res */
+        /* Recherche sans limite de 255 caract�res */
         size_t name_len = strlen(name_lower);
         if (line_len >= name_len) {
             for (size_t j = 0; j <= line_len - name_len; j++) {
