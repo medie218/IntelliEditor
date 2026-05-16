@@ -107,6 +107,9 @@ struct LlmEngine {
  *
  * TODO [DEV-C / TODO-LLM-003] : Implémenter la boucle complète.
  */
+/* Forward declaration */
+void llm_destroy(LlmEngine *engine);
+
 static void llm_worker_func(void *arg) {
     LlmEngine *engine = (LlmEngine *)arg;
     printf("[LLM Worker] Thread démarré\n");

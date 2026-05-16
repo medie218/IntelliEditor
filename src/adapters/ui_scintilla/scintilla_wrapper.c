@@ -36,8 +36,8 @@
  * =============================================================================
  */
 
-#include "ui.h"
 #include <windows.h>
+#include "ui.h"
 #include <stdio.h>
 #include <string.h>
 #include "Scintilla.h"
