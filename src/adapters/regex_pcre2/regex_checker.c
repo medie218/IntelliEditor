@@ -26,6 +26,7 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     if (!rule || !text) {
         result.status = STATUS_ERROR;
@@ -58,6 +59,7 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
 
     /* Préparer la structure de match */
     pcre2_match_data *md = pcre2_match_data_create_from_pattern(re, NULL);
+    if (!md) { result.status = STATUS_ERROR; snprintf(result.message, sizeof(result.message), "Allocation match_data échouée"); pcre2_code_free(re); return result; }
 
     int rc = pcre2_match(
         re,
