@@ -27,4 +27,4 @@ jobs:
         shell: msys2 {0}
         run: |
           cd $GITHUB_WORKSPACE
-          make ENABLE_CJSON=1 ENABLE_PCRE2=1 ENABLE_HUNSPELL=1 EXTRA_INCLUDES=-Iscintilla/include
+          make ENABLE_CJSON=1 ENABLE_PCRE2=1 ENABLE_HUNSPELL=1 EXTRA_INCLUDES=-Iscintilla/include SRC_UI_WIN32=
