@@ -144,6 +144,7 @@ static void llm_worker_func(void *arg) {
         /*
         /* Tokeniser le prompt */
         const int max_tokens = 512;
+#ifdef HAVE_LLAMA
         llama_token *tokens = malloc(max_tokens * sizeof(llama_token));
         if (!tokens) {
             response.status = LLM_RULE_STATUS_ERROR;
@@ -174,6 +175,7 @@ static void llm_worker_func(void *arg) {
         }
         llama_sampler_free(sampler);
         free(tokens);
+#endif /* HAVE_LLAMA */
         strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
         response.text[LLM_MAX_RESPONSE_LEN - 1] = '\0';
         response.status = LLM_STATUS_DONE;
@@ -232,6 +234,7 @@ LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
      *   engine->llama_ctx = llama_new_context_with_model(engine->llama_model, cparams);
      */
 
+#ifdef HAVE_LLAMA
     llama_backend_init();
 
     struct llama_model_params mparams = llama_model_default_params();
@@ -288,6 +291,7 @@ void llm_destroy(LlmEngine *engine) {
  if (engine->llama_ctx)   llama_free(engine->llama_ctx);
     if (engine->llama_model) llama_model_free(engine->llama_model);
     llama_backend_free();
+#endif /* HAVE_LLAMA */
 
     mutex_destroy(engine->mutex);
     condvar_destroy(engine->cond_work);
