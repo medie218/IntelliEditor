@@ -135,7 +135,7 @@ dirs:
 # -----------------------------------------------------------------------------
 
 TEST_SRCS  = $(wildcard tests/core/*.c) $(wildcard tests/adapters/*.c) $(wildcard tests/infra/*.c) $(wildcard tests/*.c)
-TEST_FLAGS = $(CFLAGS) -Iinclude
+TEST_FLAGS = $(CFLAGS)
 TEST_LIBS  = -lcmocka $(LIBS)
 
 ## Compiler et lancer tous les tests
