@@ -108,7 +108,7 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     cJSON *flags = cJSON_GetObjectItem(obj, "flags");
     if (flags && cJSON_IsObject(flags)) {
         cJSON *ci = cJSON_GetObjectItem(flags, "case_insensitive");
-        out->case_insensitive = cJSON_IsBool(ci) ? cJSON_IsTrue(ci) : false;
+        out->flags.case_insensitive = cJSON_IsBool(ci) ? cJSON_IsTrue(ci) : false;
     }
 
     /* target_section */
