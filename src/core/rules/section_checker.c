@@ -41,18 +41,14 @@ size_t find_section(const char *text, const char *section_name) {
         if (!end) end = line + strlen(line);
 
         size_t line_len = end - line;
-        char line_copy[256] = {0};
-        size_t copy_len = (line_len < 255) ? line_len : 255;
-        strncpy(line_copy, line, copy_len);
-
-        char line_lower[256] = {0};
-        strncpy(line_lower, line_copy, 255);
-
-        for (int i = 0; line_lower[i]; i++)
-            line_lower[i] = tolower((unsigned char)line_lower[i]);
-
-        if (strstr(line_lower, name_lower))
-            return (size_t)(line - text);
+        /* Recherche sans limite de 255 caractËres */
+        size_t name_len = strlen(name_lower);
+        if (line_len >= name_len) {
+            for (size_t j = 0; j <= line_len - name_len; j++) {
+                if (strncasecmp(line + j, name_lower, name_len) == 0)
+                    return (size_t)(line - text);
+            }
+        }
 
         line = (*end) ? end + 1 : end;
     }
@@ -129,7 +125,7 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
             snprintf(result.message, sizeof(result.message),
                      "Section '%s' avant '%s'",
                      item->valuestring,
-                     cJSON_GetArrayItem(arr, i - 1)->valuestring);
+                     i > 0 ? cJSON_GetArrayItem(arr, i - 1)->valuestring : "d√©but");
             break;
         }
 
