@@ -21,7 +21,7 @@ static void test_regex_forbidden_found(void **state) {
 
     const char *text = "Ce mot est interdit ici";
     RuleResult r = check_regex(&rule, text, strlen(text));
-    assert_int_equal(r.status, STATUS_FAIL);
+    assert_int_equal(r.status, RULE_STATUS_FAIL);
 }
 
 static void test_regex_forbidden_not_found(void **state) {
@@ -35,7 +35,7 @@ static void test_regex_forbidden_not_found(void **state) {
 
     const char *text = "Texte propre sans le mot";
     RuleResult r = check_regex(&rule, text, strlen(text));
-    assert_int_equal(r.status, STATUS_PASS);
+    assert_int_equal(r.status, RULE_STATUS_PASS);
 }
 
 static void test_regex_required_found(void **state) {
@@ -49,7 +49,7 @@ static void test_regex_required_found(void **state) {
 
     const char *text = "Ce mot est requis ici";
     RuleResult r = check_regex(&rule, text, strlen(text));
-    assert_int_equal(r.status, STATUS_PASS);
+    assert_int_equal(r.status, RULE_STATUS_PASS);
 }
 
 static void test_regex_null_params(void **state) {
@@ -61,7 +61,7 @@ static void test_regex_null_params(void **state) {
     rule.check_type = CHECK_REGEX_FORBIDDEN;
 
     RuleResult r = check_regex(&rule, NULL, 0);
-    assert_int_equal(r.status, STATUS_ERROR);
+    assert_int_equal(r.status, RULE_STATUS_ERROR);
 }
 
 int main(void) {

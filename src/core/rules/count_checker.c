@@ -220,7 +220,7 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
     parse_min_rule(rule->parameter, section, &min_words);
 
     if (min_words <= 0 || section[0] == 0) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre invalide pour word_count_min");
         return result;
@@ -228,7 +228,7 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
 
     size_t pos = find_section(text, section);
     if (pos == SIZE_MAX) {
-        result.status = STATUS_FAIL;
+        result.status = RULE_STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
                  "Section '%s' introuvable", section);
         return result;
@@ -236,7 +236,7 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
 
     char *section_text = extract_section_text(text, pos);
     if (!section_text) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Impossible d'extraire la section '%s'", section);
         return result;
@@ -246,11 +246,11 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
     free(section_text);
 
     if ((int)words >= min_words) {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots (minimum requis : %d)", words, min_words);
     } else {
-        result.status = STATUS_FAIL;
+        result.status = RULE_STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots — il en faut au moins %d", words, min_words);
     }
@@ -274,7 +274,7 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     parse_max_rule(rule->parameter, section, &max_words);
 
     if (max_words <= 0 || section[0] == 0) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre invalide pour word_count_max");
         return result;
@@ -297,11 +297,11 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     }
 
     if (word_count > (size_t)max_words) {
-        result.status = STATUS_FAIL;
+        result.status = RULE_STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
                  "Trop de mots : %zu > %d", word_count, max_words);
     } else {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "Nombre de mots OK : %zu <= %d", word_count, max_words);
     }

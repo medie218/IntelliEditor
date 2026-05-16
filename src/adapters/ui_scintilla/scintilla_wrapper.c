@@ -40,7 +40,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
-#include "../../../include/
+#include "ui.h"
 #include "Scintilla.h"
 #include "SciLexer.h"   // TODO-SCI-001 : inclure les vrais headers
 

@@ -8,7 +8,7 @@
  * Ce fichier teste :
  *   - La création/destruction des structures (RuleSet, RuleReport)
  *   - L’évaluation des règles structurelles (sections, comptage)
- *   - Le comportement des règles LLM (toujours STATUS_PENDING)
+ *   - Le comportement des règles LLM (toujours RULE_STATUS_PENDING)
  *   - La mise à jour des résultats LLM
  *
  * =============================================================================
@@ -50,7 +50,7 @@ static RuleSet *create_test_ruleset_one_rule(CheckType type,
     strncpy(set->rules[0].description, "Règle de test", RULES_MAX_DESC_LEN - 1);
     strncpy(set->rules[0].parameter,   param,  RULES_MAX_PARAM_LEN - 1);
     set->rules[0].check_type = type;
-    set->rules[0].severity   = SEVERITY_ERROR;
+    set->rules[0].severity   = RULE_SEVERITY_ERROR;
     set->rule_count = 1;
 
     return set;
@@ -119,7 +119,7 @@ static void test_check_section_exists_found(void **state) {
 
     assert_non_null(report);
     assert_int_equal(report->result_count, 1);
-    assert_int_equal(report->results[0].status, STATUS_PASS);
+    assert_int_equal(report->results[0].status, RULE_STATUS_PASS);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
@@ -137,7 +137,7 @@ static void test_check_section_exists_not_found(void **state) {
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
     assert_non_null(report);
-    assert_int_equal(report->results[0].status, STATUS_FAIL);
+    assert_int_equal(report->results[0].status, RULE_STATUS_FAIL);
 
     rulereport_destroy(report);
     ruleset_destroy(set);
@@ -160,7 +160,7 @@ static void test_check_llm_semantic_always_pending(void **state) {
 
     assert_non_null(report);
     assert_int_equal(report->result_count, 1);
-    assert_int_equal(report->results[0].status, STATUS_PENDING);
+    assert_int_equal(report->results[0].status, RULE_STATUS_PENDING);
     assert_int_equal(report->pending_count, 1);
 
     rulereport_destroy(report);
@@ -179,9 +179,9 @@ static void test_rules_update_llm_result_valid(void **state) {
 
     RuleReport *report = rules_evaluate(set, text, strlen(text));
 
-    rules_update_llm_result(report, "T001", STATUS_PASS, "OK");
+    rules_update_llm_result(report, "T001", RULE_STATUS_PASS, "OK");
 
-    assert_int_equal(report->results[0].status, STATUS_PASS);
+    assert_int_equal(report->results[0].status, RULE_STATUS_PASS);
     assert_int_equal(report->pending_count, 0);
     assert_int_equal(report->pass_count, 1);
 
@@ -193,7 +193,7 @@ static void test_rules_update_llm_result_unknown_id(void **state) {
     (void)state;
 
     RuleReport *report = rulereport_create();
-    rules_update_llm_result(report, "INEXISTANT", STATUS_PASS, NULL);
+    rules_update_llm_result(report, "INEXISTANT", RULE_STATUS_PASS, NULL);
     rulereport_destroy(report);
 }
 
@@ -210,12 +210,12 @@ static void test_check_type_to_string_known(void **state) {
 
 static void test_rule_status_to_string_all(void **state) {
     (void)state;
-    assert_non_null(rule_status_to_string(STATUS_PASS));
-    assert_non_null(rule_status_to_string(STATUS_FAIL));
-    assert_non_null(rule_status_to_string(STATUS_WARNING));
-    assert_non_null(rule_status_to_string(STATUS_PENDING));
-    assert_non_null(rule_status_to_string(STATUS_ERROR));
-    assert_non_null(rule_status_to_string(STATUS_SKIPPED));
+    assert_non_null(rule_status_to_string(RULE_STATUS_PASS));
+    assert_non_null(rule_status_to_string(RULE_STATUS_FAIL));
+    assert_non_null(rule_status_to_string(RULE_STATUS_WARNING));
+    assert_non_null(rule_status_to_string(RULE_STATUS_PENDING));
+    assert_non_null(rule_status_to_string(RULE_STATUS_ERROR));
+    assert_non_null(rule_status_to_string(RULE_STATUS_SKIPPED));
 }
 
 /* ============================================================================

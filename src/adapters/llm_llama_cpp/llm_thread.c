@@ -146,14 +146,14 @@ static void llm_worker_func(void *arg) {
         const int max_tokens = 512;
         llama_token *tokens = malloc(max_tokens * sizeof(llama_token));
         if (!tokens) {
-            response.status = LLM_STATUS_ERROR;
+            response.status = LLM_RULE_STATUS_ERROR;
             goto send_response;
         }
         const struct llama_vocab *vocab = llama_model_get_vocab(engine->llama_model);
         int n_tokens = llama_tokenize(vocab, req.prompt, (int)strlen(req.prompt), tokens, max_tokens, true, true);
         if (n_tokens <= 0) {
             free(tokens);
-            response.status = LLM_STATUS_ERROR;
+            response.status = LLM_RULE_STATUS_ERROR;
             goto send_response;
         }
         printf("[LLM] %d tokens\n", n_tokens);

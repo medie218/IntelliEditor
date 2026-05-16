@@ -29,7 +29,7 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
     result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     if (!rule || !text) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètres invalides (NULL)");
         return result;
@@ -51,7 +51,7 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
     );
 
     if (!re) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Regex invalide à la position %zu", (size_t)erroffset);
         return result;
@@ -59,7 +59,7 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
 
     /* Préparer la structure de match */
     pcre2_match_data *md = pcre2_match_data_create_from_pattern(re, NULL);
-    if (!md) { result.status = STATUS_ERROR; snprintf(result.message, sizeof(result.message), "Allocation match_data échouée"); pcre2_code_free(re); return result; }
+    if (!md) { result.status = RULE_STATUS_ERROR; snprintf(result.message, sizeof(result.message), "Allocation match_data échouée"); pcre2_code_free(re); return result; }
 
     int rc = pcre2_match(
         re,
@@ -85,29 +85,29 @@ RuleResult check_regex(const Rule *rule, const char *text, size_t len) {
     /* Interprétation selon le type */
     if (rule->check_type == CHECK_REGEX_FORBIDDEN) {
         if (found) {
-            result.status = STATUS_FAIL;
+            result.status = RULE_STATUS_FAIL;
             snprintf(result.message, sizeof(result.message),
                      "Expression interdite trouvée en position %zu",
                      result.position);
         } else {
-            result.status = STATUS_PASS;
+            result.status = RULE_STATUS_PASS;
             snprintf(result.message, sizeof(result.message),
                      "Aucune expression interdite trouvée");
         }
     }
     else if (rule->check_type == CHECK_REGEX_REQUIRED) {
         if (found) {
-            result.status = STATUS_PASS;
+            result.status = RULE_STATUS_PASS;
             snprintf(result.message, sizeof(result.message),
                      "Expression requise trouvée");
         } else {
-            result.status = STATUS_FAIL;
+            result.status = RULE_STATUS_FAIL;
             snprintf(result.message, sizeof(result.message),
                      "Expression requise absente");
         }
     }
     else {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Type de règle non supporté par regex_checker");
     }

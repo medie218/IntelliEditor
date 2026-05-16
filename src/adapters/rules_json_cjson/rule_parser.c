@@ -46,11 +46,11 @@ static CheckType parse_check_type(const char *str) {
 }
 
 static Severity parse_severity(const char *str) {
-    if (!str) return SEVERITY_WARNING;
-    if (strcmp(str, "error")   == 0) return SEVERITY_ERROR;
-    if (strcmp(str, "warning") == 0) return SEVERITY_WARNING;
-    if (strcmp(str, "info")    == 0) return SEVERITY_INFO;
-    return SEVERITY_WARNING;
+    if (!str) return RULE_SEVERITY_WARNING;
+    if (strcmp(str, "error")   == 0) return RULE_SEVERITY_ERROR;
+    if (strcmp(str, "warning") == 0) return RULE_SEVERITY_WARNING;
+    if (strcmp(str, "info")    == 0) return RULE_SEVERITY_INFO;
+    return RULE_SEVERITY_WARNING;
 }
 
 /* ============================================================================

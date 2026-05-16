@@ -403,9 +403,9 @@ void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
     for (size_t i = 0; i < report->result_count; i++) {
         char line[300];
         const char *icon =
-            report->results[i].status == STATUS_PASS    ? '[OK] ' :
-            report->results[i].status == STATUS_FAIL    ? '[KO] ' :
-            report->results[i].status == STATUS_PENDING ? '[..] ' : '[!!] ';
+            report->results[i].status == RULE_STATUS_PASS    ? '[OK] ' :
+            report->results[i].status == RULE_STATUS_FAIL    ? '[KO] ' :
+            report->results[i].status == RULE_STATUS_PENDING ? '[..] ' : '[!!] ';
         snprintf(line, sizeof(line), '%s%s — %s',
                  icon,
                  report->results[i].rule_id,

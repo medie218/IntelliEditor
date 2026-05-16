@@ -39,18 +39,18 @@ typedef enum {
 } CheckType;
 
 typedef enum {
-    SEVERITY_ERROR = 0,
-    SEVERITY_WARNING,
-    SEVERITY_INFO
+    RULE_SEVERITY_ERROR = 0,
+    RULE_SEVERITY_WARNING,
+    RULE_SEVERITY_INFO
 } Severity;
 
 typedef enum {
-    STATUS_PASS = 0,
-    STATUS_FAIL,
-    STATUS_WARNING,
-    STATUS_PENDING,
-    STATUS_ERROR,
-    STATUS_SKIPPED
+    RULE_STATUS_PASS = 0,
+    RULE_STATUS_FAIL,
+    RULE_STATUS_WARNING,
+    RULE_STATUS_PENDING,
+    RULE_STATUS_ERROR,
+    RULE_STATUS_SKIPPED
 } RuleStatus;
 
 /* ============================================================================

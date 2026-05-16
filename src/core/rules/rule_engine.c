@@ -72,7 +72,7 @@ void rulereport_destroy(RuleReport *report) {
  *
  * TODO [DEV-D / TODO-RULES-002] :
  *   Implémenter le dispatch complet. Pour l'instant, tous les cas
- *   retournent STATUS_SKIPPED.
+ *   retournent RULE_STATUS_SKIPPED.
  */
 static RuleResult evaluate_single_rule(const Rule *rule,
                                         const char *text,
@@ -97,7 +97,7 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              *   Indice : chercher une ligne commençant par '#' + le titre,
              *   ou en MAJUSCULES pour H1.
              */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             snprintf(result.message, sizeof(result.message),
                      "TODO: vérificateur section_exists non implémenté");
             break;
@@ -109,14 +109,14 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              *   Extraire min_words depuis rule->parameter (JSON)
              *   Compter les mots dans la section cible
              */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             snprintf(result.message, sizeof(result.message),
                      "TODO: vérificateur word_count_min non implémenté");
             break;
 
         case CHECK_WORD_COUNT_MAX:
             /* TODO [DEV-D / TODO-CHECK-003] : similaire à WORD_COUNT_MIN */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             break;
 
         case CHECK_REGEX_FORBIDDEN:
@@ -127,7 +127,7 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              *   Utiliser l'adapter regex_pcre2 pour compiler et matcher la regex
              *   rule->parameter contient la regex, rule->case_insensitive les flags
              */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             snprintf(result.message, sizeof(result.message),
                      "TODO: vérificateur regex non implémenté");
             break;
@@ -139,17 +139,17 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              *   Trouver toutes les sections dans le texte
              *   Vérifier que leur ordre correspond au tableau attendu
              */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             break;
 
         case CHECK_HEADING_FORMAT:
             /* TODO [DEV-D / TODO-CHECK-006] */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             break;
 
         case CHECK_CITATION_PRESENT:
             /* TODO [DEV-D / TODO-CHECK-007] */
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             break;
 
         case CHECK_LLM_SEMANTIC:
@@ -158,13 +158,13 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              * Elles sont marquées PENDING ici.
              * Le thread LLM les traitera et appellera rules_update_llm_result().
              */
-            result.status = STATUS_PENDING;
+            result.status = RULE_STATUS_PENDING;
             snprintf(result.message, sizeof(result.message),
                      "Vérification sémantique LLM en attente...");
             break;
 
         default:
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             snprintf(result.message, sizeof(result.message),
                      "Type de règle inconnu: %d", rule->check_type);
             break;
@@ -186,10 +186,10 @@ RuleReport *rules_evaluate(const RuleSet *set, const char *text, size_t len) {
 
         /* Mettre à jour les compteurs du rapport */
         switch (report->results[i].status) {
-            case STATUS_PASS:    report->pass_count++;    break;
-            case STATUS_FAIL:    report->fail_count++;    break;
-            case STATUS_WARNING: report->warning_count++; break;
-            case STATUS_PENDING: report->pending_count++; break;
+            case RULE_STATUS_PASS:    report->pass_count++;    break;
+            case RULE_STATUS_FAIL:    report->fail_count++;    break;
+            case RULE_STATUS_WARNING: report->warning_count++; break;
+            case RULE_STATUS_PENDING: report->pending_count++; break;
             default: break;
         }
     }
@@ -212,7 +212,7 @@ void rules_update_llm_result(RuleReport *report,
     for (size_t i = 0; i < report->result_count; i++) {
         if (strcmp(report->results[i].rule_id, rule_id) == 0) {
             /* Mettre à jour les compteurs */
-            if (report->results[i].status == STATUS_PENDING) {
+            if (report->results[i].status == RULE_STATUS_PENDING) {
                 report->pending_count--;
             }
             report->results[i].status = status;
@@ -220,9 +220,9 @@ void rules_update_llm_result(RuleReport *report,
                 strncpy(report->results[i].message, message, 255);
                 report->results[i].message[255] = '\0';
             }
-            if (status == STATUS_PASS)    report->pass_count++;
-            if (status == STATUS_FAIL)    report->fail_count++;
-            if (status == STATUS_WARNING) report->warning_count++;
+            if (status == RULE_STATUS_PASS)    report->pass_count++;
+            if (status == RULE_STATUS_FAIL)    report->fail_count++;
+            if (status == RULE_STATUS_WARNING) report->warning_count++;
             return;
         }
     }
@@ -252,12 +252,12 @@ const char *check_type_to_string(CheckType type) {
 
 const char *rule_status_to_string(RuleStatus status) {
     switch (status) {
-        case STATUS_PASS:    return "✅ PASS";
-        case STATUS_FAIL:    return "❌ FAIL";
-        case STATUS_WARNING: return "⚠️  WARNING";
-        case STATUS_PENDING: return "🔄 PENDING";
-        case STATUS_ERROR:   return "💥 ERROR";
-        case STATUS_SKIPPED: return "⏭️  SKIPPED";
+        case RULE_STATUS_PASS:    return "✅ PASS";
+        case RULE_STATUS_FAIL:    return "❌ FAIL";
+        case RULE_STATUS_WARNING: return "⚠️  WARNING";
+        case RULE_STATUS_PENDING: return "🔄 PENDING";
+        case RULE_STATUS_ERROR:   return "💥 ERROR";
+        case RULE_STATUS_SKIPPED: return "⏭️  SKIPPED";
         default:             return "?";
     }
 }
