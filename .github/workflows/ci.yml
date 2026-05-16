@@ -1,0 +1,17 @@
+name: CI - Tests IntelliEditor
+
+on:
+  push:
+    branches: [ main, dev-A, dev-B, dev-C, dev-D ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Installer dépendances
+        run: sudo apt-get install -y libcmocka-dev libpcre2-dev
+      - name: Compiler et tester
+        run: make test
