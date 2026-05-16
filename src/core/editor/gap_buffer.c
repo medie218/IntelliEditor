@@ -1,4 +1,4 @@
-#include "../../include/editor.h"
+#include "editor.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

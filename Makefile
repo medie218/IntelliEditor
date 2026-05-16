@@ -38,11 +38,32 @@ WFLAGS  = -DWIN32_LEAN_AND_MEAN -DUNICODE -D_UNICODE
 # Bibliothèques de liaison
 LIBS    = -lcomctl32 -lcomdlg32 -lgdi32 -luser32 -lkernel32
 
-# TODO [DEV-A / TODO-MAKE-001] : décommenter au fur et à mesure
-# LIBS  += -lcjson          # Quand rules_json_cjson sera actif
-# LIBS  += -lpcre2-8        # Quand regex_pcre2 sera actif
-# LIBS  += -lhunspell-1.7   # Quand hunspell_wrap sera actif
-# LIBS  += -lllama          # Quand llm_llama_cpp sera actif
+# ── Adapters externes optionnels ──────────────────────────────
+# Usage : make ENABLE_HUNSPELL=1 ENABLE_LLAMA=1 etc.
+ENABLE_HUNSPELL ?= 0
+ENABLE_LLAMA    ?= 0
+ENABLE_CJSON    ?= 0
+ENABLE_PCRE2    ?= 0
+
+ifeq ($(ENABLE_HUNSPELL),1)
+    LIBS   += -lhunspell-1.7
+    CFLAGS += -DHAVE_HUNSPELL
+endif
+
+ifeq ($(ENABLE_LLAMA),1)
+    LIBS   += -lstdc++ -lm -lws2_32 -lgomp
+    CFLAGS += -DHAVE_LLAMA
+endif
+
+ifeq ($(ENABLE_CJSON),1)
+    LIBS   += -lcjson
+    CFLAGS += -DHAVE_CJSON
+endif
+
+ifeq ($(ENABLE_PCRE2),1)
+    LIBS   += -lpcre2-8
+    CFLAGS += -DHAVE_PCRE2
+endif
 
 # -----------------------------------------------------------------------------
 # RÉPERTOIRES
@@ -93,7 +114,7 @@ all: dirs $(TARGET)
 $(TARGET): $(OBJS_LIB) $(OBJ_MAIN)
 	@echo "[LINK] $@"
 	$(CC) $(CFLAGS) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
-	@echo "✅ Build terminé : $@"
+	@echo " Build terminé : $@"
 
 ## Compiler un fichier objet
 $(BUILD_DIR)/%.o: %.c

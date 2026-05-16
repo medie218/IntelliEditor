@@ -4,12 +4,14 @@
  */
 
 #include "rules.h"
-#include "../../../include/storage.h"
+#include "storage.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
-#include <cjson/cJSON.h>   /* Phase 2 : parser JSON */
+#ifdef HAVE_CJSON
+#include <cjson/cJSON.h>
+#endif   /* Phase 2 : parser JSON */
 
 /* ============================================================================
  * Helpers internes
@@ -62,16 +64,19 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     cJSON *id = cJSON_GetObjectItem(obj, "id");
     if (cJSON_IsString(id))
         strncpy(out->id, id->valuestring, RULES_MAX_ID_LEN - 1);
+        out->id[RULES_MAX_ID_LEN - 1] = '\0';
 
     /* description */
     cJSON *desc = cJSON_GetObjectItem(obj, "description");
     if (cJSON_IsString(desc))
         strncpy(out->description, desc->valuestring, RULES_MAX_DESC_LEN - 1);
+        out->description[RULES_MAX_DESC_LEN - 1] = '\0';
 
     /* category */
     cJSON *cat = cJSON_GetObjectItem(obj, "category");
     if (cJSON_IsString(cat))
         strncpy(out->category, cat->valuestring, 32 - 1);
+        out->category[32 - 1] = '\0';
 
     /* check_type */
     cJSON *ctype = cJSON_GetObjectItem(obj, "check_type");
@@ -88,10 +93,12 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     if (param) {
         if (cJSON_IsString(param)) {
             strncpy(out->parameter, param->valuestring, RULES_MAX_PARAM_LEN - 1);
+            out->parameter[RULES_MAX_PARAM_LEN - 1] = '\0';
         } else {
             char *json = serialize_json(param);
             if (json) {
                 strncpy(out->parameter, json, RULES_MAX_PARAM_LEN - 1);
+                out->parameter[RULES_MAX_PARAM_LEN - 1] = '\0';
                 free(json);
             }
         }
@@ -108,6 +115,7 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
     cJSON *ts = cJSON_GetObjectItem(obj, "target_section");
     if (cJSON_IsString(ts))
         strncpy(out->target_section, ts->valuestring, 64 - 1);
+        out->target_section[64 - 1] = '\0';
 }
 
 /* ============================================================================
@@ -144,14 +152,17 @@ RuleSet *ruleset_load_from_file(const char *filepath) {
         cJSON *dt = cJSON_GetObjectItem(meta, "document_type");
         if (cJSON_IsString(dt))
             strncpy(set->meta.document_type, dt->valuestring, 63);
+            set->meta.document_type[63] = '\0';
 
         cJSON *ver = cJSON_GetObjectItem(meta, "version");
         if (cJSON_IsString(ver))
             strncpy(set->meta.version, ver->valuestring, 31);
+            set->meta.version[31] = '\0';
 
         cJSON *auth = cJSON_GetObjectItem(meta, "author");
         if (cJSON_IsString(auth))
             strncpy(set->meta.author, auth->valuestring, 63);
+            set->meta.author[63] = '\0';
     }
 
     /* rules */
@@ -169,3 +180,4 @@ RuleSet *ruleset_load_from_file(const char *filepath) {
     cJSON_Delete(root);
     return set;
 }
+

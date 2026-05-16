@@ -1,4 +1,6 @@
+#ifdef HAVE_CJSON
 #include <cjson/cJSON.h>
+#endif
 /**
  * @file section_checker.c
  * @brief Vérificateurs de sections — CORE / rules / checkers
@@ -66,6 +68,7 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     const char *section = rule->parameter;
 
@@ -99,6 +102,7 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     cJSON *arr = cJSON_Parse(rule->parameter);
     if (!arr || !cJSON_IsArray(arr)) {
@@ -153,6 +157,7 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     cJSON *obj = cJSON_Parse(rule->parameter);
     if (!obj || !cJSON_IsObject(obj)) {
@@ -214,3 +219,4 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
 
     return result;
 }
+

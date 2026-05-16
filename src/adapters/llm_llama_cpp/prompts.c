@@ -18,7 +18,7 @@
  * =============================================================================
  */
 
-#include "../../../include/llm.h"
+#include "llm.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -109,3 +109,4 @@ size_t llm_prompt_semantic_check(const char *question,
         "<|im_start|>assistant\n",
         SYSTEM_PROMPT, question, section);   
 }
+

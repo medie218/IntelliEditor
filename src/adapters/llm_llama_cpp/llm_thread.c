@@ -29,8 +29,8 @@
  * =============================================================================
  */
 
-#include "../../../include/llm.h"
-#include "../../../include/threads.h"
+#include "llm.h"
+#include "threads.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -40,7 +40,9 @@
  *   Décommenter quand llama.cpp est disponible.
  *   Voir : https://github.com/ggerganov/llama.cpp
  */
- #include <llama.h>
+ #ifdef HAVE_LLAMA
+#include <llama.h>
+#endif
 
  
 
@@ -173,6 +175,7 @@ static void llm_worker_func(void *arg) {
         llama_sampler_free(sampler);
         free(tokens);
         strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
+        response.text[LLM_MAX_RESPONSE_LEN - 1] = '\0';
         response.status = LLM_STATUS_DONE;
         response.confidence = 1.0f;
         send_response:
@@ -196,6 +199,7 @@ LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
     if (!engine) return NULL;
 
     strncpy(engine->model_path, model_path ? model_path : "", 511);
+    engine->model_path[511] = '\0';
     engine->next_id = 1;
     engine->running = false;
     engine->model_loaded = false;
@@ -317,6 +321,7 @@ LlmRequestId llm_submit_request(LlmEngine   *engine,
     req->userdata = userdata;
     req->cancelled = false;
     strncpy(req->prompt, prompt, LLM_MAX_PROMPT_LEN - 1);
+    req->prompt[LLM_MAX_PROMPT_LEN - 1] = '\0';
 
     engine->queue_tail = (engine->queue_tail + 1) % LLM_REQUEST_QUEUE_SIZE;
     engine->queue_count++;
@@ -350,3 +355,4 @@ size_t llm_queue_size(const LlmEngine *engine) {
     if (!engine) return 0;
     return engine->queue_count;
 }
+
