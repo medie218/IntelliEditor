@@ -29,6 +29,8 @@
 CC      = gcc
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -Wno-unused-parameter
 CFLAGS += -Iinclude
+EXTRA_INCLUDES ?=
+CFLAGS += $(EXTRA_INCLUDES)
 CFLAGS += -g  # Symboles de debug (à retirer en release avec -O2)
 
 # Flags Windows (nécessaires pour l'API Win32)
