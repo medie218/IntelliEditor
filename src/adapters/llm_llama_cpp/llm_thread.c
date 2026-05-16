@@ -141,6 +141,7 @@ static void llm_worker_func(void *arg) {
         memset(&response, 0, sizeof(response));
         response.id = req.id;
 
+        char result_buf[LLM_MAX_RESPONSE_LEN] = {0};
         /*
         /* Tokeniser le prompt */
         const int max_tokens = 512;
