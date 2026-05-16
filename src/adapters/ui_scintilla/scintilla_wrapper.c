@@ -40,7 +40,6 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
-#include "ui.h"
 #include "Scintilla.h"
 #include "SciLexer.h"   // TODO-SCI-001 : inclure les vrais headers
 
@@ -79,13 +78,29 @@ bool scintilla_load(void) {
 }
 
 /**
+ * @brief Configure les paramètres par défaut de Scintilla.
+ */
+void scintilla_configure_defaults(HWND sci) {
+    /* Retour à la ligne automatique */
+    SendMessageA(sci, SCI_SETWRAPMODE, SC_WRAP_WORD, 0);
+    /* Numéros de ligne (marge 0, largeur 40px) */
+    SendMessageA(sci, SCI_SETMARGINWIDTHN, 0, 40);
+    /* Police Consolas 12pt */
+    SendMessageA(sci, SCI_STYLESETFONT, 32, (LPARAM)"Consolas");
+    SendMessageA(sci, SCI_STYLESETSIZE, 32, 12);
+    /* Indicateur 0 : fautes ortho (rouge squiggle) */
+    SendMessageA(sci, SCI_INDICSETSTYLE, 0, INDIC_SQUIGGLE);
+    SendMessageA(sci, SCI_INDICSETFORE,  0, RGB(220,50,47));
+}
+
+/**
  * @brief Crée le contrôle Scintilla dans une fenêtre parent.
  */
 HWND scintilla_create(HWND parent, HINSTANCE hi, int x, int y, int w, int h) {
     if (!scintilla_load()) return NULL;
  
     HWND hwnd = CreateWindowExA(
-        0, 'Scintilla', '',
+        0, "Scintilla", "",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN,
         x, y, w, h,
         parent, NULL, hi, NULL
@@ -94,44 +109,6 @@ HWND scintilla_create(HWND parent, HINSTANCE hi, int x, int y, int w, int h) {
     scintilla_configure_defaults(hwnd);
     return hwnd;
 }
- 
-void scintilla_configure_defaults(HWND sci) {
-    /* Retour à la ligne automatique */
-    SendMessageA(sci, SCI_SETWRAPMODE, SC_WRAP_WORD, 0);
-    /* Numéros de ligne (marge 0, largeur 40px) */
-    SendMessageA(sci, SCI_SETMARGINWIDTHN, 0, 40);
-    /* Police Consolas 12pt */
-    SendMessageA(sci, SCI_STYLESETFONT, 32, (LPARAM)'Consolas');
-    SendMessageA(sci, SCI_STYLESETSIZE, 32, 12);
-    /* Indicateur 0 : fautes ortho (rouge squiggle) */
-    SendMessageA(sci, SCI_INDICSETSTYLE, 0, INDIC_SQUIGGLE);
-    SendMessageA(sci, SCI_INDICSETFORE,  0, RGB(220,50,47));
-}
-RECT rc; GetClientRect(hwnd, &rc);
-int panel_w = UI_RULES_PANEL_W;
-new_ctx->hwnd_scintilla = scintilla_create(
-    hwnd, new_ctx->hinstance,
-    0, 30,                          /* x=0, y=30 (sous la toolbar) */
-    rc.right - panel_w,             /* largeur */
-    rc.bottom - 30 - 20             /* hauteur - toolbar - statusbar */
-);
-void ui_sync_text(AppContext *ctx) {
-    if (!ctx || !ctx->doc || !ctx->hwnd_scintilla) return;
- 
-    char *text = editor_get_text(ctx->doc);
-    if (!text) return;
- 
-    /* Envoyer le texte à Scintilla */
-    SendMessageA(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
-    free(text);
- 
-    /* Mettre à jour la barre de statut */
-    DocStats stats;
-    editor_compute_stats(ctx->doc, &stats);
-    ui_update_statusbar(ctx, stats.word_count, 0, 0);
-}
-
-
 
 /**
  * @brief Envoie un texte UTF-8 vers Scintilla.
@@ -154,6 +131,18 @@ char *scintilla_get_text(HWND hwnd_sci) {
     SendMessageA(hwnd_sci, SCI_GETTEXT, (WPARAM)(len + 1), (LPARAM)buf);
     return buf;
 }
+
+/**
+ * @brief Positionne le curseur Scintilla à une position donnée.
+ */
+void scintilla_goto_pos(HWND hwnd_sci, size_t pos) {
+    if (!hwnd_sci) return;
+    SendMessageA(hwnd_sci, SCI_GOTOPOS, (WPARAM)pos, 0);
+}
+
+/**
+ * @brief Applique les marqueurs NLP sur l'éditeur Scintilla.
+ */
 void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
     if (!ctx->hwnd_scintilla || !result) return;
     HWND sci = ctx->hwnd_scintilla;
@@ -175,10 +164,20 @@ void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
 }
 
 /**
- * @brief Positionne le curseur Scintilla à une position donnée.
+ * @brief Synchronise le texte de l'éditeur avec Scintilla.
  */
-void scintilla_goto_pos(HWND hwnd_sci, size_t pos) {
-    if (!hwnd_sci) return;
-    SendMessageA(hwnd_sci, SCI_GOTOPOS, (WPARAM)pos, 0);
+void ui_sync_text(AppContext *ctx) {
+    if (!ctx || !ctx->doc || !ctx->hwnd_scintilla) return;
+ 
+    char *text = editor_get_text(ctx->doc);
+    if (!text) return;
+ 
+    /* Envoyer le texte à Scintilla */
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
+    free(text);
+ 
+    /* Mettre à jour la barre de statut */
+    DocStats stats;
+    editor_compute_stats(ctx->doc, &stats);
+    ui_update_statusbar(ctx, stats.word_count, 0, 0);
 }
-
