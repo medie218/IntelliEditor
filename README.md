@@ -7,6 +7,17 @@
 [![Architecture](https://img.shields.io/badge/Architecture-Hexagonale-green)]()
 [![Statut](https://img.shields.io/badge/Statut-En%20cours%20(base%20de%20projet)-yellow)]()
 
+## Build
+
+Pour lancer la compilation sous MSYS2 / MinGW64 :
+
+- Avec Bash : `./make`
+- Avec cmd.exe : `make.bat`
+
+Ces wrappers pointent vers le `make` disponible dans `C:\msys64\usr\bin\make.exe` ou `mingw32-make.exe`.
+
+---
+
 ---
 
 ## Présentation

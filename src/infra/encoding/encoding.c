@@ -105,3 +105,20 @@ const char *encoding_utf8_char_at(const char *utf8, size_t index) {
     return NULL;
 }
 
+
+
+bool patched_utf8_validator(const char *utf8) {
+    if (!utf8)
+        return false;
+
+    int result = MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        utf8,
+        -1,
+        NULL,
+        0
+    );
+
+    return result > 0;
+}

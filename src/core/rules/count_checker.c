@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
-/* ============================================================================
- * Helpers internes
+/* ===================================================================== * Helpers internes
  * ============================================================================ */
 
 /**
@@ -162,7 +161,7 @@ static void parse_min_rule(const char *json, char *section_out, int *min_words) 
                 const char *start = s;
                 while (*s && *s != '"') s++;
                 size_t len = s - start;
-                strncpy(section_out, start, len);
+                strncpy(section_out, start, len); /* patched */
                 section_out[len] = '\0';
                 section_out[len] = 0;
             }
@@ -191,7 +190,7 @@ static void parse_max_rule(const char *json, char *section_out, int *max_words) 
                 const char *start = s;
                 while (*s && *s != '"') s++;
                 size_t len = s - start;
-                strncpy(section_out, start, len);
+                strncpy(section_out, start, len); /* patched */
                 section_out[len] = '\0';
                 section_out[len] = 0;
             }
@@ -205,13 +204,12 @@ static void parse_max_rule(const char *json, char *section_out, int *max_words) 
     }
 }
 
-/* ============================================================================
- * CHECK_WORD_COUNT_MIN
+/* ===================================================================== * CHECK_WORD_COUNT_MIN
  * ============================================================================ */
 
 RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
-    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1); /* patched */
     result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     char section[128];
@@ -259,13 +257,12 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
     return result;
 }
 
-/* ============================================================================
- * CHECK_WORD_COUNT_MAX
+/* ===================================================================== * CHECK_WORD_COUNT_MAX
  * ============================================================================ */
 
 RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) {
     RuleResult result = {0};
-    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1); /* patched */
     result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     char section[128];
@@ -281,8 +278,7 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     }
 
 
-
-    /* Logique principale manquante - compter les mots et vérifier */
+    /* Compter les mots et vérifier le maximum */
     size_t word_count = 0;
     const char *p = text;
     bool in_word = false;

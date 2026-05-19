@@ -1,0 +1,6 @@
+all:
+	@printf 'SHELL=%s\n' '$(SHELL)'
+	@printf 'TMP=%s\n' '$(TMP)'
+	@printf 'TEMP=%s\n' '$(TEMP)'
+	@printf 'TMPDIR=%s\n' '$(TMPDIR)'
+	@env | grep -iE 'TMP|TEMP|TMPDIR|SHELL'

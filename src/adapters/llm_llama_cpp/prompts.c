@@ -2,10 +2,8 @@
  * @file prompts.c
  * @brief Templates de prompts pour le LLM — ADAPTER / llm_llama_cpp
  *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Construit les prompts structurés envoyés au LLM selon la tâche.
+ * ====================================================================== * RÔLE
+ * ====================================================================== * Construit les prompts structurés envoyés au LLM selon la tâche.
  * Le prompt engineering est centralisé ici pour faciliter les ajustements.
  *
  * PRINCIPE D'UN BON PROMPT :
@@ -15,8 +13,7 @@
  *   - Exemple si nécessaire (few-shot)
  *
  * RESPONSABLE : DEV-C
- * =============================================================================
- */
+ * ====================================================================== */
 
 #include "llm.h"
 #include <stdio.h>

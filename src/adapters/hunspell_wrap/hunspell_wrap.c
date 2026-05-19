@@ -2,10 +2,8 @@
  * @file hunspell_wrap.c
  * @brief Wrapper Hunspell — ADAPTER / hunspell_wrap
  *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Intègre la bibliothèque Hunspell pour la correction orthographique du français.
+ * ====================================================================== * RÔLE
+ * ====================================================================== * Intègre la bibliothèque Hunspell pour la correction orthographique du français.
  * Implémente l'interface SpellChecker définie dans nlp.h.
  *
  * HUNSPELL :
@@ -26,8 +24,7 @@
  *   Lier avec -lhunspell-1.7 (ou -lhunspell selon la version)
  *
  * RESPONSABLE : DEV-C
- * =============================================================================
- */
+ * ====================================================================== */
 
 #include "nlp.h"
 #include <stdlib.h>
@@ -44,8 +41,7 @@
 #include <hunspell/hunspell.h>
 #endif
 
-/* ============================================================================
- * STRUCTURE INTERNE
+/* ===================================================================== * STRUCTURE INTERNE
  * ============================================================================ */
 
 /**
@@ -59,8 +55,7 @@ struct SpellChecker {
 };
 
 
-/* ============================================================================
- * API
+/* ===================================================================== * API
  * ============================================================================ */
 
 /**
@@ -80,9 +75,9 @@ SpellChecker *spellchecker_create(const char *aff_path, const char *dic_path) {
     SpellChecker *sc = calloc(1, sizeof(SpellChecker));
     if (!sc) return NULL;
 
-    strncpy(sc->aff_path, aff_path ? aff_path : "", 511);
+    strncpy(sc->aff_path, aff_path ? aff_path : "", 511); /* patched */
     sc->aff_path[511] = '\0';
-    strncpy(sc->dic_path, dic_path ? dic_path : "", 511);
+    strncpy(sc->dic_path, dic_path ? dic_path : "", 511); /* patched */
     sc->dic_path[511] = '\0';
     sc->loaded = false;
     sc->hunspell_handle = NULL;
@@ -151,7 +146,7 @@ void spellcheck_suggest(const SpellChecker *sc,
     char **hsuggestions = NULL;
     int n = Hunspell_suggest(sc->hunspell_handle, &hsuggestions, word);
     for (int i = 0; i < n && i < NLP_MAX_SUGGESTIONS; i++) {
-        strncpy(suggestions[i].word, hsuggestions[i], NLP_MAX_WORD_LEN - 1);
+        strncpy(suggestions[i].word, hsuggestions[i], NLP_MAX_WORD_LEN - 1); /* patched */
         suggestions[i].word[NLP_MAX_WORD_LEN - 1] = '\0';
         suggestions[i].confidence = 1.0f - (float)i / (float)n;
     }
@@ -209,7 +204,7 @@ void spellcheck_analyze(const SpellChecker *sc,
                 err->type  = NLP_ERROR_SPELLING;
                 err->start = word_start;
                 err->length = word_len;
-                strncpy(err->original, word, NLP_MAX_WORD_LEN - 1);
+                strncpy(err->original, word, NLP_MAX_WORD_LEN - 1); /* patched */
                 err->original[NLP_MAX_WORD_LEN - 1] = '\0';
                 snprintf(err->message, sizeof(err->message),
                          "Mot inconnu : '%s'", word);

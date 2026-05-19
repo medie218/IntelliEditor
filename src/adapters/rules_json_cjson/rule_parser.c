@@ -13,8 +13,7 @@
 #include <cjson/cJSON.h>
 #endif   /* Phase 2 : parser JSON */
 
-/* ============================================================================
- * Helpers internes
+/* ===================================================================== * Helpers internes
  * ============================================================================ */
 
 static char *dup_json_string(cJSON *item) {
@@ -27,8 +26,7 @@ static char *serialize_json(cJSON *item) {
     return cJSON_PrintUnformatted(item);
 }
 
-/* ============================================================================
- * parse_check_type() et parse_severity() déjà corrects
+/* ===================================================================== * parse_check_type() et parse_severity() déjà corrects
  * ============================================================================ */
 
 static CheckType parse_check_type(const char *str) {
@@ -53,8 +51,7 @@ static Severity parse_severity(const char *str) {
     return RULE_SEVERITY_WARNING;
 }
 
-/* ============================================================================
- * parse_rule_object() — cœur du parser
+/* ===================================================================== * parse_rule_object() — cœur du parser
  * ============================================================================ */
 
 static void parse_rule_object(cJSON *obj, Rule *out) {
@@ -62,42 +59,47 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
 
     /* id */
     cJSON *id = cJSON_GetObjectItem(obj, "id");
-    if (cJSON_IsString(id))
-        strncpy(out->id, id->valuestring, RULES_MAX_ID_LEN - 1);
+    if (cJSON_IsString(id)) {
+        strncpy(out->id, id->valuestring, RULES_MAX_ID_LEN - 1); /* patched */
         out->id[RULES_MAX_ID_LEN - 1] = '\0';
+    }
 
     /* description */
     cJSON *desc = cJSON_GetObjectItem(obj, "description");
-    if (cJSON_IsString(desc))
-        strncpy(out->description, desc->valuestring, RULES_MAX_DESC_LEN - 1);
+    if (cJSON_IsString(desc)) {
+        strncpy(out->description, desc->valuestring, RULES_MAX_DESC_LEN - 1); /* patched */
         out->description[RULES_MAX_DESC_LEN - 1] = '\0';
+    }
 
     /* category */
     cJSON *cat = cJSON_GetObjectItem(obj, "category");
-    if (cJSON_IsString(cat))
-        strncpy(out->category, cat->valuestring, 32 - 1);
+    if (cJSON_IsString(cat)) {
+        strncpy(out->category, cat->valuestring, 32 - 1); /* patched */
         out->category[32 - 1] = '\0';
+    }
 
     /* check_type */
     cJSON *ctype = cJSON_GetObjectItem(obj, "check_type");
-    if (cJSON_IsString(ctype))
+    if (cJSON_IsString(ctype)) {
         out->check_type = parse_check_type(ctype->valuestring);
+    }
 
     /* severity */
     cJSON *sev = cJSON_GetObjectItem(obj, "severity");
-    if (cJSON_IsString(sev))
+    if (cJSON_IsString(sev)) {
         out->severity = parse_severity(sev->valuestring);
+    }
 
     /* parameter : string / object / array */
     cJSON *param = cJSON_GetObjectItem(obj, "parameter");
     if (param) {
         if (cJSON_IsString(param)) {
-            strncpy(out->parameter, param->valuestring, RULES_MAX_PARAM_LEN - 1);
+            strncpy(out->parameter, param->valuestring, RULES_MAX_PARAM_LEN - 1); /* patched */
             out->parameter[RULES_MAX_PARAM_LEN - 1] = '\0';
         } else {
             char *json = serialize_json(param);
             if (json) {
-                strncpy(out->parameter, json, RULES_MAX_PARAM_LEN - 1);
+                strncpy(out->parameter, json, RULES_MAX_PARAM_LEN - 1); /* patched */
                 out->parameter[RULES_MAX_PARAM_LEN - 1] = '\0';
                 free(json);
             }
@@ -113,13 +115,13 @@ static void parse_rule_object(cJSON *obj, Rule *out) {
 
     /* target_section */
     cJSON *ts = cJSON_GetObjectItem(obj, "target_section");
-    if (cJSON_IsString(ts))
-        strncpy(out->target_section, ts->valuestring, 64 - 1);
+    if (cJSON_IsString(ts)) {
+        strncpy(out->target_section, ts->valuestring, 64 - 1); /* patched */
         out->target_section[64 - 1] = '\0';
+    }
 }
 
-/* ============================================================================
- * ruleset_load_from_file() — fonction principale
+/* ===================================================================== * ruleset_load_from_file() — fonction principale
  * ============================================================================ */
 
 RuleSet *ruleset_load_from_file(const char *filepath) {
@@ -150,29 +152,32 @@ RuleSet *ruleset_load_from_file(const char *filepath) {
     cJSON *meta = cJSON_GetObjectItem(root, "meta");
     if (meta && cJSON_IsObject(meta)) {
         cJSON *dt = cJSON_GetObjectItem(meta, "document_type");
-        if (cJSON_IsString(dt))
-            strncpy(set->meta.document_type, dt->valuestring, 63);
+        if (cJSON_IsString(dt)) {
+            strncpy(set->meta.document_type, dt->valuestring, 63); /* patched */
             set->meta.document_type[63] = '\0';
+        }
 
         cJSON *ver = cJSON_GetObjectItem(meta, "version");
-        if (cJSON_IsString(ver))
-            strncpy(set->meta.version, ver->valuestring, 31);
+        if (cJSON_IsString(ver)) {
+            strncpy(set->meta.version, ver->valuestring, 31); /* patched */
             set->meta.version[31] = '\0';
+        }
 
         cJSON *auth = cJSON_GetObjectItem(meta, "author");
-        if (cJSON_IsString(auth))
-            strncpy(set->meta.author, auth->valuestring, 63);
+        if (cJSON_IsString(auth)) {
+            strncpy(set->meta.author, auth->valuestring, 63); /* patched */
             set->meta.author[63] = '\0';
+        }
     }
 
     /* rules */
     cJSON *rules = cJSON_GetObjectItem(root, "rules");
     if (rules && cJSON_IsArray(rules)) {
-        int count = cJSON_GetArraySize(rules);
+        size_t count = (size_t)cJSON_GetArraySize(rules);
         set->rule_count = (count > RULES_MAX_RULES) ? RULES_MAX_RULES : count;
 
-        for (int i = 0; i < set->rule_count; i++) {
-            cJSON *obj = cJSON_GetArrayItem(rules, i);
+        for (size_t i = 0; i < set->rule_count; i++) {
+            cJSON *obj = cJSON_GetArrayItem(rules, (int)i);
             parse_rule_object(obj, &set->rules[i]);
         }
     }

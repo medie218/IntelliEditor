@@ -27,8 +27,17 @@
 # -----------------------------------------------------------------------------
 
 CC      = gcc
+PATH := /c/msys64/ucrt64/bin:/c/msys64/mingw64/bin:/usr/bin:/bin:$(PATH)
+export PATH
+
+TMP ?= /c/msys64/tmp
+TEMP ?= /c/msys64/tmp
+TMPDIR ?= /c/msys64/tmp
+export TMP TEMP TMPDIR
+
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -Wno-unused-parameter
 CFLAGS += -Iinclude
+CFLAGS += -Iscintilla/include
 CFLAGS += -g  # Symboles de debug (à retirer en release avec -O2)
 
 # Chemins d'inclusion supplémentaires (optionnel, à passer en ligne de commande)
@@ -74,9 +83,24 @@ endif
 # -----------------------------------------------------------------------------
 
 SRC_CORE     = src/core/editor src/core/rules src/core/nlp
-SRC_ADAPTERS = src/adapters/ui_win32 src/adapters/ui_scintilla \
-               src/adapters/llm_llama_cpp src/adapters/hunspell_wrap \
-               src/adapters/rules_json_cjson src/adapters/regex_pcre2
+SRC_ADAPTERS = src/adapters/ui_win32 src/adapters/ui_scintilla
+
+ifeq ($(ENABLE_LLAMA),1)
+SRC_ADAPTERS += src/adapters/llm_llama_cpp
+endif
+
+ifeq ($(ENABLE_HUNSPELL),1)
+SRC_ADAPTERS += src/adapters/hunspell_wrap
+endif
+
+ifeq ($(ENABLE_CJSON),1)
+SRC_ADAPTERS += src/adapters/rules_json_cjson
+endif
+
+ifeq ($(ENABLE_PCRE2),1)
+SRC_ADAPTERS += src/adapters/regex_pcre2
+endif
+
 SRC_INFRA    = src/infra/config_ini src/infra/encoding \
                src/infra/threads src/infra/storage
 
@@ -181,7 +205,7 @@ $(BUILD_DIR)/tests/infra/test_infra.o: tests/infra/test_infra.c
 clean:
 	@echo "[CLEAN] Suppression de build/ et bin/"
 	rm -rf $(BUILD_DIR) $(BIN_DIR)
-	@echo "✅ Nettoyage terminé"
+	@echo " Nettoyage terminé"
 
 # -----------------------------------------------------------------------------
 # AIDE

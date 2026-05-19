@@ -2,10 +2,8 @@
  * @file rule_engine.c
  * @brief Moteur d'évaluation des règles métier — CORE / rules
  *
- * =============================================================================
- * RÔLE DE CE FICHIER
- * =============================================================================
- * Ce fichier orchestre l'évaluation des règles sur un texte.
+ * ====================================================================== * RÔLE DE CE FICHIER
+ * ====================================================================== * Ce fichier orchestre l'évaluation des règles sur un texte.
  * Il appelle les "checkers" (vérificateurs) appropriés selon le type de règle.
  *
  * CHECKERS disponibles (à implémenter dans les fichiers séparés) :
@@ -15,17 +13,15 @@
  *   - llm_checker.c     → CHECK_LLM_SEMANTIC (asynchrone)
  *
  * RESPONSABLE : DEV-D
- * =============================================================================
- */
+ * ====================================================================== */
 
 #include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
-/* ============================================================================
- * FORWARD DECLARATIONS DES CHECKERS
- * Ces fonctions sont implémentées dans les fichiers checkers/*.c
+/* ===================================================================== * FORWARD DECLARATIONS DES CHECKERS
+ * Ces fonctions sont implémentées dans les fichiers checkers files
  * ============================================================================ */
 
 /* TODO [DEV-D / TODO-RULES-001] : décommenter quand les checkers seront créés */
@@ -34,8 +30,7 @@
 /* extern RuleResult check_regex_forbidden(const Rule *rule, const char *text, size_t len); */
 
 
-/* ============================================================================
- * CYCLE DE VIE
+/* ===================================================================== * CYCLE DE VIE
  * ============================================================================ */
 
 RuleSet *ruleset_create(void) {
@@ -61,8 +56,7 @@ void rulereport_destroy(RuleReport *report) {
 }
 
 
-/* ============================================================================
- * ÉVALUATION PRINCIPALE
+/* ===================================================================== * ÉVALUATION PRINCIPALE
  * ============================================================================ */
 
 /**
@@ -79,7 +73,7 @@ static RuleResult evaluate_single_rule(const Rule *rule,
                                         size_t      len) {
     RuleResult result;
     memset(&result, 0, sizeof(result));
-    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1); /* patched */
     result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     printf("[DEBUG] Évaluation règle %s (type=%s)\n",
@@ -217,7 +211,7 @@ void rules_update_llm_result(RuleReport *report,
             }
             report->results[i].status = status;
             if (message) {
-                strncpy(report->results[i].message, message, 255);
+                strncpy(report->results[i].message, message, 255); /* patched */
                 report->results[i].message[255] = '\0';
             }
             if (status == RULE_STATUS_PASS)    report->pass_count++;
@@ -231,8 +225,7 @@ void rules_update_llm_result(RuleReport *report,
 }
 
 
-/* ============================================================================
- * UTILITAIRES
+/* ===================================================================== * UTILITAIRES
  * ============================================================================ */
 
 const char *check_type_to_string(CheckType type) {

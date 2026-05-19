@@ -3,8 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ============================================================================
- * GAP BUFFER — INTERNAL
+/* ===================================================================== * GAP BUFFER — INTERNAL
  * ============================================================================ */
 
 static bool gap_buffer_ensure_gap(GapBuffer *gb, size_t needed) {
@@ -58,8 +57,7 @@ static void gap_buffer_move_gap(GapBuffer *gb, size_t pos) {
     }
 }
 
-/* ============================================================================
- * LIFECYCLE
+/* ===================================================================== * LIFECYCLE
  * ============================================================================ */
 
 EditorDocument *editor_create(void) {
@@ -98,8 +96,7 @@ void editor_destroy(EditorDocument *doc) {
     free(doc);
 }
 
-/* ============================================================================
- * TEXT OPERATIONS
+/* ===================================================================== * TEXT OPERATIONS
  * ============================================================================ */
 
 bool editor_insert(EditorDocument *doc, const char *text, size_t length) {
@@ -194,8 +191,7 @@ size_t editor_get_length(const EditorDocument *doc) {
     return doc->gap.capacity - (doc->gap.gap_end - doc->gap.gap_start);
 }
 
-/* ============================================================================
- * UNDO / REDO
+/* ===================================================================== * UNDO / REDO
  * ============================================================================ */
 
 bool editor_undo(EditorDocument *doc) {
@@ -258,8 +254,7 @@ bool editor_can_redo(const EditorDocument *doc) {
     return doc && doc->history.redo_top >= 0;
 }
 
-/* ============================================================================
- * STATS
+/* ===================================================================== * STATS
  * ============================================================================ */
 
 void editor_compute_stats(const EditorDocument *doc, DocStats *stats) {
@@ -299,4 +294,35 @@ void editor_compute_stats(const EditorDocument *doc, DocStats *stats) {
     stats->paragraph_count++;
 
     free(text);
+}
+
+
+/* safer gap resize helper */
+static bool patched_gap_resize(
+    GapBuffer *gb,
+    size_t new_size
+) {
+    char *new_buf = malloc(new_size);
+
+    if (!new_buf)
+        return false;
+
+    memcpy(new_buf, gb->buf, gb->gap_start);
+
+    size_t tail_size = gb->capacity - gb->gap_end;
+    size_t new_gap_end = new_size - tail_size;
+
+    memcpy(
+        new_buf + new_gap_end,
+        gb->buf + gb->gap_end,
+        tail_size
+    );
+
+    free(gb->buf);
+
+    gb->buf = new_buf;
+    gb->gap_end = new_gap_end;
+    gb->capacity = new_size;
+
+    return true;
 }

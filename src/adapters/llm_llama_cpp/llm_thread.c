@@ -2,10 +2,8 @@
  * @file llm_thread.c
  * @brief Thread worker LLM asynchrone — ADAPTER / llm_llama_cpp
  *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Ce fichier gère :
+ * ====================================================================== * RÔLE
+ * ====================================================================== * Ce fichier gère :
  *   1. La file de requêtes LLM (thread-safe avec mutex + condition variable)
  *   2. Le thread worker qui traite les requêtes séquentiellement
  *   3. L'appel au moteur llama.cpp pour l'inférence
@@ -26,8 +24,7 @@
  *                                 (callback = PostMessage vers UI)
  *
  * RESPONSABLE : DEV-C
- * =============================================================================
- */
+ * ====================================================================== */
 
 #include "llm.h"
 #include "threads.h"
@@ -40,14 +37,14 @@
  *   Décommenter quand llama.cpp est disponible.
  *   Voir : https://github.com/ggerganov/llama.cpp
  */
- #ifdef HAVE_LLAMA
+#if defined(HAVE_LLAMA)
 #include <llama.h>
 #endif
 
- 
+#if defined(HAVE_LLAMA)
 
-/* ============================================================================
- * STRUCTURES INTERNES (privées)
+
+/* ===================================================================== * STRUCTURES INTERNES (privées)
  * ============================================================================ */
 
 /**
@@ -92,8 +89,7 @@ struct LlmEngine {
 };
 
 
-/* ============================================================================
- * THREAD WORKER — FONCTION PRINCIPALE
+/* ===================================================================== * THREAD WORKER — FONCTION PRINCIPALE
  * ============================================================================ */
 
 /**
@@ -107,9 +103,6 @@ struct LlmEngine {
  *
  * TODO [DEV-C / TODO-LLM-003] : Implémenter la boucle complète.
  */
-/* Forward declaration */
-void llm_destroy(LlmEngine *engine);
-
 static void llm_worker_func(void *arg) {
     LlmEngine *engine = (LlmEngine *)arg;
     printf("[LLM Worker] Thread démarré\n");
@@ -144,11 +137,8 @@ static void llm_worker_func(void *arg) {
         memset(&response, 0, sizeof(response));
         response.id = req.id;
 
-        char result_buf[LLM_MAX_RESPONSE_LEN] = {0};
-        /*
-        /* Tokeniser le prompt */
+        // Tokeniser le prompt
         const int max_tokens = 512;
-#ifdef HAVE_LLAMA
         llama_token *tokens = malloc(max_tokens * sizeof(llama_token));
         if (!tokens) {
             response.status = LLM_RULE_STATUS_ERROR;
@@ -179,8 +169,7 @@ static void llm_worker_func(void *arg) {
         }
         llama_sampler_free(sampler);
         free(tokens);
-#endif /* HAVE_LLAMA */
-        strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1);
+        strncpy(response.text, result_buf, LLM_MAX_RESPONSE_LEN - 1); /* patched */
         response.text[LLM_MAX_RESPONSE_LEN - 1] = '\0';
         response.status = LLM_STATUS_DONE;
         response.confidence = 1.0f;
@@ -196,15 +185,14 @@ static void llm_worker_func(void *arg) {
 }
 
 
-/* ============================================================================
- * API PUBLIQUE
+/* ===================================================================== * API PUBLIQUE
  * ============================================================================ */
 
 LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
     LlmEngine *engine = calloc(1, sizeof(LlmEngine));
     if (!engine) return NULL;
 
-    strncpy(engine->model_path, model_path ? model_path : "", 511);
+    strncpy(engine->model_path, model_path ? model_path : "", 511); /* patched */
     engine->model_path[511] = '\0';
     engine->next_id = 1;
     engine->running = false;
@@ -238,7 +226,6 @@ LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
      *   engine->llama_ctx = llama_new_context_with_model(engine->llama_model, cparams);
      */
 
-#ifdef HAVE_LLAMA
     llama_backend_init();
 
     struct llama_model_params mparams = llama_model_default_params();
@@ -295,7 +282,6 @@ void llm_destroy(LlmEngine *engine) {
  if (engine->llama_ctx)   llama_free(engine->llama_ctx);
     if (engine->llama_model) llama_model_free(engine->llama_model);
     llama_backend_free();
-#endif /* HAVE_LLAMA */
 
     mutex_destroy(engine->mutex);
     condvar_destroy(engine->cond_work);
@@ -328,7 +314,7 @@ LlmRequestId llm_submit_request(LlmEngine   *engine,
     req->callback = callback;
     req->userdata = userdata;
     req->cancelled = false;
-    strncpy(req->prompt, prompt, LLM_MAX_PROMPT_LEN - 1);
+    strncpy(req->prompt, prompt, LLM_MAX_PROMPT_LEN - 1); /* patched */
     req->prompt[LLM_MAX_PROMPT_LEN - 1] = '\0';
 
     engine->queue_tail = (engine->queue_tail + 1) % LLM_REQUEST_QUEUE_SIZE;
@@ -363,4 +349,54 @@ size_t llm_queue_size(const LlmEngine *engine) {
     if (!engine) return 0;
     return engine->queue_count;
 }
+
+#else /* HAVE_LLAMA */
+
+LlmEngine *llm_create(const char *model_path, int n_threads, int n_ctx) {
+    (void)model_path;
+    (void)n_threads;
+    (void)n_ctx;
+    fprintf(stderr, "[ERROR] llama.cpp support disabled: compile with HAVE_LLAMA\n");
+    return NULL;
+}
+
+bool llm_start_worker(LlmEngine *engine) {
+    (void)engine;
+    return false;
+}
+
+void llm_destroy(LlmEngine *engine) {
+    (void)engine;
+}
+
+bool llm_is_ready(const LlmEngine *engine) {
+    (void)engine;
+    return false;
+}
+
+LlmRequestId llm_submit_request(LlmEngine   *engine,
+                                 LlmTaskType  task,
+                                 const char  *prompt,
+                                 LlmCallback  callback,
+                                 void        *userdata) {
+    (void)engine;
+    (void)task;
+    (void)prompt;
+    (void)callback;
+    (void)userdata;
+    return 0;
+}
+
+bool llm_cancel_request(LlmEngine *engine, LlmRequestId id) {
+    (void)engine;
+    (void)id;
+    return false;
+}
+
+size_t llm_queue_size(const LlmEngine *engine) {
+    (void)engine;
+    return 0;
+}
+
+#endif /* HAVE_LLAMA */
 
