@@ -11,10 +11,10 @@
  *   - section_checker.c → CHECK_SECTION_EXISTS, CHECK_SECTION_ORDER, CHECK_HEADING_FORMAT
  *   - count_checker.c   → CHECK_WORD_COUNT_MIN, CHECK_WORD_COUNT_MAX
  *   - regex_checker.c   → CHECK_REGEX_FORBIDDEN, CHECK_REGEX_REQUIRED
- *   - LLM (asynchrone)  → CHECK_LLM_SEMANTIC (STATUS_PENDING)
+ *   - LLM (asynchrone)  → CHECK_LLM_SEMANTIC (RULE_STATUS_PENDING)
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -66,6 +66,7 @@ static RuleResult evaluate_single_rule(const Rule *rule,
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     printf("[DEBUG] Évaluation règle %s (type=%s)\n",
            rule->id,
@@ -97,13 +98,13 @@ static RuleResult evaluate_single_rule(const Rule *rule,
              * On les marque PENDING ici, et le thread LLM
              * mettra à jour le résultat via rules_update_llm_result().
              */
-            result.status = STATUS_PENDING;
+            result.status = RULE_STATUS_PENDING;
             snprintf(result.message, sizeof(result.message),
                      "Vérification sémantique LLM en attente...");
             return result;
 
         default:
-            result.status = STATUS_SKIPPED;
+            result.status = RULE_STATUS_SKIPPED;
             snprintf(result.message, sizeof(result.message),
                      "Type de règle inconnu: %d", rule->check_type);
             return result;
@@ -126,10 +127,10 @@ RuleReport *rules_evaluate(const RuleSet *set, const char *text, size_t len) {
         report->results[i] = evaluate_single_rule(&set->rules[i], text, len);
 
         switch (report->results[i].status) {
-            case STATUS_PASS:    report->pass_count++;    break;
-            case STATUS_FAIL:    report->fail_count++;    break;
-            case STATUS_WARNING: report->warning_count++; break;
-            case STATUS_PENDING: report->pending_count++; break;
+            case RULE_STATUS_PASS:    report->pass_count++;    break;
+            case RULE_STATUS_FAIL:    report->fail_count++;    break;
+            case RULE_STATUS_WARNING: report->warning_count++; break;
+            case RULE_STATUS_PENDING: report->pending_count++; break;
             default: break;
         }
     }
@@ -155,17 +156,19 @@ void rules_update_llm_result(RuleReport *report,
 
     for (size_t i = 0; i < report->result_count; i++) {
         if (strcmp(report->results[i].rule_id, rule_id) == 0) {
-            if (report->results[i].status == STATUS_PENDING)
+            if (report->results[i].status == RULE_STATUS_PENDING)
                 report->pending_count--;
 
             report->results[i].status = status;
 
-            if (message)
+            if (message) {
                 strncpy(report->results[i].message, message, sizeof(report->results[i].message) - 1);
+                report->results[i].message[sizeof(report->results[i].message) - 1] = '\0';
+            }
 
-            if (status == STATUS_PASS)    report->pass_count++;
-            if (status == STATUS_FAIL)    report->fail_count++;
-            if (status == STATUS_WARNING) report->warning_count++;
+            if (status == RULE_STATUS_PASS)    report->pass_count++;
+            if (status == RULE_STATUS_FAIL)    report->fail_count++;
+            if (status == RULE_STATUS_WARNING) report->warning_count++;
             return;
         }
     }
@@ -194,12 +197,12 @@ const char *check_type_to_string(CheckType type) {
 
 const char *rule_status_to_string(RuleStatus status) {
     switch (status) {
-        case STATUS_PASS:    return "✅ PASS";
-        case STATUS_FAIL:    return "❌ FAIL";
-        case STATUS_WARNING: return "⚠️  WARNING";
-        case STATUS_PENDING: return "🔄 PENDING";
-        case STATUS_ERROR:   return "💥 ERROR";
-        case STATUS_SKIPPED: return "⏭️  SKIPPED";
+        case RULE_STATUS_PASS:    return "✅ PASS";
+        case RULE_STATUS_FAIL:    return "❌ FAIL";
+        case RULE_STATUS_WARNING: return "⚠️  WARNING";
+        case RULE_STATUS_PENDING: return "🔄 PENDING";
+        case RULE_STATUS_ERROR:   return "💥 ERROR";
+        case RULE_STATUS_SKIPPED: return "⏭️  SKIPPED";
         default:             return "?";
     }
 }

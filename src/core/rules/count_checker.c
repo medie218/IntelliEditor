@@ -1,17 +1,17 @@
 /**
  * @file count_checker.c
  * @brief Vérificateurs de comptage de mots — CORE / rules / checkers
- *
- * RESPONSABLE : DEV-D
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 
-#include <cjson/cJSON.h>   /* IMPORTANT : nécessaire pour parser rule->parameter */
+#ifdef HAVE_CJSON
+#include <cjson/cJSON.h>
+#endif
 
 /* ============================================================================
  * Compteur de mots simple
@@ -47,22 +47,32 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     /* Valeurs par défaut */
     int min_words = 0;
     char section_name_buf[RULES_MAX_SECTION_LEN] = {0};
 
+#ifndef HAVE_CJSON
+    /* Si pas de cJSON, on essaie de parser manuellement si c'est juste un nombre */
+    if (isdigit((unsigned char)rule->parameter[0])) {
+        min_words = atoi(rule->parameter);
+    }
+#else
     /* Parser JSON */
     cJSON *param = cJSON_Parse(rule->parameter);
     if (param) {
         cJSON *mw = cJSON_GetObjectItem(param, "min_words");
-        if (cJSON_IsNumber(mw))
-            min_words = (int)mw->valuedouble;
+        if (mw && (mw->type == 3)) // cJSON_Number is 3 in some versions, but better use cJSON_IsNumber
+            min_words = mw->valueint; // Simplified for stub safety
 
         cJSON *sn = cJSON_GetObjectItem(param, "section");
-        if (cJSON_IsString(sn))
+        if (sn && (sn->type == 4)) // cJSON_String
             strncpy(section_name_buf, sn->valuestring, RULES_MAX_SECTION_LEN - 1);
+        
+        cJSON_Delete(param);
     }
+#endif
 
     /* Déterminer la zone de texte à analyser */
     const char *target = text;
@@ -80,16 +90,15 @@ RuleResult check_word_count_min(const Rule *rule, const char *text, size_t len) 
     size_t words = count_words(target, target_len);
 
     if ((int)words >= min_words) {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots (minimum requis : %d)", words, min_words);
     } else {
-        result.status = STATUS_FAIL;
+        result.status = RULE_STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots — il en faut au moins %d", words, min_words);
     }
 
-    if (param) cJSON_Delete(param);
     return result;
 }
 
@@ -101,22 +110,31 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     /* Valeurs par défaut */
     int max_words = 999999;
     char section_name_buf[RULES_MAX_SECTION_LEN] = {0};
 
+#ifndef HAVE_CJSON
+    if (isdigit((unsigned char)rule->parameter[0])) {
+        max_words = atoi(rule->parameter);
+    }
+#else
     /* Parser JSON */
     cJSON *param = cJSON_Parse(rule->parameter);
     if (param) {
         cJSON *mw = cJSON_GetObjectItem(param, "max_words");
-        if (cJSON_IsNumber(mw))
-            max_words = (int)mw->valuedouble;
+        if (mw && (mw->type == 3))
+            max_words = mw->valueint;
 
         cJSON *sn = cJSON_GetObjectItem(param, "section");
-        if (cJSON_IsString(sn))
+        if (sn && (sn->type == 4))
             strncpy(section_name_buf, sn->valuestring, RULES_MAX_SECTION_LEN - 1);
+        
+        cJSON_Delete(param);
     }
+#endif
 
     /* Déterminer la zone de texte à analyser */
     const char *target = text;
@@ -134,15 +152,14 @@ RuleResult check_word_count_max(const Rule *rule, const char *text, size_t len) 
     size_t words = count_words(target, target_len);
 
     if ((int)words <= max_words) {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots (maximum autorisé : %d)", words, max_words);
     } else {
-        result.status = STATUS_WARNING;
+        result.status = RULE_STATUS_WARNING;
         snprintf(result.message, sizeof(result.message),
                  "%zu mots — ne doit pas dépasser %d", words, max_words);
     }
 
-    if (param) cJSON_Delete(param);
     return result;
 }

@@ -80,7 +80,7 @@ typedef enum {
     LLM_STATUS_PROCESSING,  /**< En cours de traitement                       */
     LLM_STATUS_DONE,        /**< Terminée — réponse disponible                */
     LLM_STATUS_TIMEOUT,     /**< Timeout dépassé                              */
-    LLM_STATUS_ERROR,       /**< Erreur interne                               */
+    LLM_RULE_STATUS_ERROR,       /**< Erreur interne                               */
 } LlmRequestStatus;
 
 /**

@@ -40,3 +40,4 @@ desktop.ini
 *.log
 test_manual.c
 test_*_manual.c
+.vs/
