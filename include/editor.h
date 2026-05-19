@@ -161,6 +161,32 @@ size_t editor_get_length(const EditorDocument *doc);
 
 
 /* ============================================================================
+ * API PUBLIQUE — RECHERCHE ET REMPLACEMENT
+ * ============================================================================ */
+
+/**
+ * @brief Recherche une chaîne de caractères dans le document.
+ * 
+ * @param doc        Le document.
+ * @param query      La chaîne à rechercher (UTF-8).
+ * @param start_pos  Position de départ de la recherche.
+ * @return           Index de la première occurrence, ou SIZE_MAX si non trouvé.
+ */
+size_t editor_search(const EditorDocument *doc, const char *query, size_t start_pos);
+
+/**
+ * @brief Remplace une plage de texte par une nouvelle chaîne.
+ * 
+ * @param doc       Le document.
+ * @param pos       Position du texte à remplacer.
+ * @param len       Longueur du texte à supprimer.
+ * @param new_text  Texte de remplacement.
+ * @return true     Si le remplacement a réussi.
+ */
+bool editor_replace(EditorDocument *doc, size_t pos, size_t len, const char *new_text);
+
+
+/* ============================================================================
  * API PUBLIQUE — UNDO / REDO
  * ============================================================================ */
 

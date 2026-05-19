@@ -152,6 +152,43 @@ static void llm_worker_func(void *arg) {
 #ifdef HAVE_LLAMA
 send_response:
 #endif
+
+#ifdef HAVE_CJSON
+        /* Post-traitement si la réponse est un JSON (format attendu par nos prompts) */
+        cJSON *root = cJSON_Parse(response.text);
+        if (root) {
+            char formatted[LLM_MAX_RESPONSE_LEN] = {0};
+            int pos = 0;
+
+            cJSON *errors = cJSON_GetObjectItem(root, "errors");
+            if (cJSON_IsArray(errors)) {
+                pos += snprintf(formatted + pos, LLM_MAX_RESPONSE_LEN - pos, "Suggestions de correction :\n");
+                int n = cJSON_GetArraySize(errors);
+                for (int i = 0; i < n && pos < LLM_MAX_RESPONSE_LEN - 50; i++) {
+                    cJSON *item = cJSON_GetArrayItem(errors, i);
+                    cJSON *orig = cJSON_GetObjectItem(item, "original");
+                    cJSON *corr = cJSON_GetObjectItem(item, "corrected");
+                    if (cJSON_IsString(orig) && cJSON_IsString(corr)) {
+                        pos += snprintf(formatted + pos, LLM_MAX_RESPONSE_LEN - pos, 
+                                        "- '%s' -> '%s'\n", orig->valuestring, corr->valuestring);
+                    }
+                }
+            } else {
+                cJSON *ref = cJSON_GetObjectItem(root, "reformulation");
+                if (cJSON_IsString(ref)) {
+                    pos += snprintf(formatted + pos, LLM_MAX_RESPONSE_LEN - pos, 
+                                    "Reformulation proposée :\n%s", ref->valuestring);
+                }
+            }
+
+            if (pos > 0) {
+                strncpy(response.text, formatted, LLM_MAX_RESPONSE_LEN - 1);
+                response.text[LLM_MAX_RESPONSE_LEN - 1] = '\0';
+            }
+            cJSON_Delete(root);
+        }
+#endif
+
         if (req.callback) {
             req.callback(&response, req.userdata);
         }

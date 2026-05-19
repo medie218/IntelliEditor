@@ -7,26 +7,30 @@ bin/
 *.a
 *.dll
 *.exe
-!SciLexer.dll      # Garder la DLL Scintilla si elle est dans le repo
+!SciLexer.dll
+!Scintilla.dll
+!Lexilla.dll
 
-# Modèles LLM (trop gros pour Git — utiliser Git LFS si nécessaire)
+# Modèles LLM (trop gros pour Git)
 *.gguf
 *.bin
 models/
+data/models/
 
-# Dictionnaires (peuvent être régénérés ou téléchargés)
+# Dictionnaires
 data/dicts/
 
-# Configuration locale (contient des chemins machine-spécifiques)
-# Note : commiter un config.ini.example à la place
+# Configuration locale
 *.ini
 !config.ini.example
 
-# IDE
+# IDE et outils
 .vscode/
 .idea/
 *.vcxproj
 *.sln
+*.slnx
+.vs/
 CMakeCache.txt
 CMakeFiles/
 
@@ -35,9 +39,10 @@ CMakeFiles/
 Thumbs.db
 desktop.ini
 
-# Temporaires
+# Temporaires et logs
 *.tmp
 *.log
+output.txt
+verbose.txt
 test_manual.c
 test_*_manual.c
-.vs/

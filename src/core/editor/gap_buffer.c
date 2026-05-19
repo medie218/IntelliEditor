@@ -195,6 +195,52 @@ size_t editor_get_length(const EditorDocument *doc) {
 }
 
 /* ============================================================================
+ * SEARCH / REPLACE
+ * ============================================================================ */
+
+size_t editor_search(const EditorDocument *doc, const char *query, size_t start_pos) {
+    if (!doc || !query || *query == '\0') return SIZE_MAX;
+
+    char *text = editor_get_text(doc);
+    if (!text) return SIZE_MAX;
+
+    size_t len = strlen(text);
+    if (start_pos >= len) {
+        free(text);
+        return SIZE_MAX;
+    }
+
+    char *found = strstr(text + start_pos, query);
+    size_t res = SIZE_MAX;
+    if (found) {
+        res = (size_t)(found - text);
+    }
+
+    free(text);
+    return res;
+}
+
+bool editor_replace(EditorDocument *doc, size_t pos, size_t len, const char *new_text) {
+    if (!doc || !new_text) return false;
+
+    /* Vérifier les bornes */
+    size_t doc_len = editor_get_length(doc);
+    if (pos + len > doc_len) return false;
+
+    /* 
+     * Pour une implémentation simple et robuste avant la deadline, 
+     * on combine delete + insert.
+     * Note: cela crée deux entrées dans l'historique undo.
+     */
+    if (len > 0) {
+        if (!editor_delete(doc, pos, len)) return false;
+    }
+
+    editor_move_cursor(doc, pos);
+    return editor_insert(doc, new_text, strlen(new_text));
+}
+
+/* ============================================================================
  * UNDO / REDO
  * ============================================================================ */
 

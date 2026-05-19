@@ -60,24 +60,43 @@ bool storage_write_txt(const char *filepath, const char *text, size_t len) {
 }
 
 bool storage_write_rtf(const char *filepath, const char *text, size_t len) {
-    /*
-     * TODO [DEV-A / TODO-STORAGE-002] :
-     *   Générer les balises RTF manuellement :
-     *   {\rtf1\ansi\deff0
-     *   {\fonttbl{\f0 Consolas;}}
-     *   {\f0\fs24 texte ici...}
-     *   }
-     *
-     *   ATTENTION : encoder les caractères UTF-8 en \uN? pour RTF
-     */
-    (void)text;
-    (void)len;
-    fprintf(stderr, "[STUB] storage_write_rtf: TODO-STORAGE-002\n");
+    if (!filepath || !text) return false;
 
-    /* STUB : écrire un RTF minimal */
-    FILE *f = fopen(filepath, "w");
+    FILE *f = fopen(filepath, "wb");
     if (!f) return false;
-    fprintf(f, "{\\rtf1\\ansi TODO: export RTF non implémenté}\n");
+
+    /* En-tête RTF minimal : RTF 1.0, ANSI, Police Consolas */
+    fprintf(f, "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fmodern Consolas;}}\\f0\\fs24 ");
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)text[i];
+
+        if (c == '\\' || c == '{' || c == '}') {
+            /* Échappement des caractères spéciaux RTF */
+            fprintf(f, "\\%c", c);
+        } else if (c == '\n') {
+            /* Saut de paragraphe RTF */
+            fprintf(f, "\\par\n");
+        } else if (c == '\r') {
+            /* Ignorer les retours chariot (souvent suivis de \n) */
+            continue;
+        } else if (c == '\t') {
+            /* Tabulation RTF */
+            fprintf(f, "\\tab ");
+        } else if (c < 128) {
+            /* Caractères ASCII standard */
+            fputc(c, f);
+        } else {
+            /* 
+             * Pour les caractères étendus (UTF-8), une implémentation complète
+             * nécessiterait une conversion vers \uXXXX.
+             * Pour cette version, on écrit les octets tels quels (dépend du lecteur).
+             */
+            fputc(c, f);
+        }
+    }
+
+    fprintf(f, "}");
     fclose(f);
     return true;
 }

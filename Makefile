@@ -46,7 +46,7 @@ LIBS    = -lcomctl32 -lcomdlg32 -lgdi32 -luser32 -lkernel32
 # Usage : make ENABLE_HUNSPELL=1 ENABLE_LLAMA=1 etc.
 ENABLE_HUNSPELL ?= 0
 ENABLE_LLAMA    ?= 0
-ENABLE_CJSON    ?= 0
+ENABLE_CJSON    ?= 1
 ENABLE_PCRE2    ?= 0
 
 ifeq ($(ENABLE_HUNSPELL),1)

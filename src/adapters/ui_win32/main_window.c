@@ -73,6 +73,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmd, int nShow) {
     char model_path[MAX_PATH];
     GetPrivateProfileStringA("AI", "model_path", "data/models/tinyllama.gguf", model_path, MAX_PATH, "config.ini");
     ctx.llm_engine = llm_create(model_path, 4, 2048);
+    ctx.llm_enabled = true; // Par défaut activé
     if (ctx.llm_engine) {
         if (llm_start_worker(ctx.llm_engine)) {
             ctx.llm_ready = true;
@@ -260,7 +261,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             break;
         }
         case ID_TOOLS_GRAMMAR: {
-            if (!ctx->llm_ready) { MessageBoxA(hwnd, "IA non disponible", "IA", MB_ICONWARNING); break; }
+            if (!ctx->llm_enabled || !ctx->llm_ready) { MessageBoxA(hwnd, "IA désactivée ou non disponible", "IA", MB_ICONWARNING); break; }
             char *text = editor_get_text(ctx->doc);
             if (text) {
                 llm_submit_request(ctx->llm_engine, LLM_TASK_GRAMMAR_CHECK, text, ui_llm_callback, ctx);
@@ -269,9 +270,30 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             break;
         }
+        case ID_TOOLS_LLM_TOGGLE: {
+            ctx->llm_enabled = !ctx->llm_enabled;
+            HMENU hMenu = GetMenu(hwnd);
+            CheckMenuItem(hMenu, ID_TOOLS_LLM_TOGGLE, ctx->llm_enabled ? MF_CHECKED : MF_UNCHECKED);
+            break;
+        }
         case ID_FILE_EXIT: DestroyWindow(hwnd); break;
         case ID_EDIT_UNDO: editor_undo(ctx->doc); ui_sync_text(ctx); break;
         case ID_EDIT_REDO: editor_redo(ctx->doc); ui_sync_text(ctx); break;
+        case ID_EDIT_BOLD:
+            SendMessage(ctx->hwnd_scintilla, SCI_SETSELBACK, TRUE, RGB(200, 200, 200)); // Stub visual
+            break;
+        case ID_TOOLS_CORRECT:
+        case ID_TOOLS_REFORMULATE:
+            if (!ctx->llm_enabled || !ctx->llm_ready) { MessageBoxA(hwnd, "IA désactivée ou non disponible", "IA", MB_ICONWARNING); break; }
+            char *sel_text = editor_get_text(ctx->doc); // Idéalement juste la sélection
+            if (sel_text) {
+                llm_submit_request(ctx->llm_engine, 
+                    (id == ID_TOOLS_CORRECT) ? LLM_TASK_GRAMMAR_CHECK : LLM_TASK_REFORMULATE, 
+                    sel_text, ui_llm_callback, ctx);
+                SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)"IA en cours...");
+                free(sel_text);
+            }
+            break;
         }
         return 0;
     }
@@ -332,6 +354,7 @@ static bool create_menu(HWND hwnd) {
     AppendMenuA(mEdit, MF_STRING, ID_EDIT_REDO, "Rétablir");
     AppendMenuA(mTools, MF_STRING, ID_TOOLS_RULES_LOAD, "Charger règles...");
     AppendMenuA(mTools, MF_STRING, ID_TOOLS_GRAMMAR, "IA : Grammaire");
+    AppendMenuA(mTools, MF_STRING | MF_CHECKED, ID_TOOLS_LLM_TOGGLE, "IA Activée");
     AppendMenuA(bar, MF_POPUP, (UINT_PTR)mFile, "Fichier");
     AppendMenuA(bar, MF_POPUP, (UINT_PTR)mEdit, "Edition");
     AppendMenuA(bar, MF_POPUP, (UINT_PTR)mTools, "Outils");
@@ -339,18 +362,41 @@ static bool create_menu(HWND hwnd) {
 }
 
 static bool create_toolbar(AppContext *ctx) {
-    ctx->hwnd_toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT, 0, 0, 0, 0, ctx->hwnd_main, NULL, ctx->hinstance, NULL);
+    ctx->hwnd_toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, 
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | TBSTYLE_LIST, 
+        0, 0, 0, 0, ctx->hwnd_main, NULL, ctx->hinstance, NULL);
+
     SendMessage(ctx->hwnd_toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+
+    /* Ajouter les bitmaps standards */
+    TBADDBITMAP tb;
+    tb.hInst = HINST_COMMCTRL;
+    tb.nID = IDB_STD_SMALL_COLOR;
+    SendMessage(ctx->hwnd_toolbar, TB_ADDBITMAP, 0, (LPARAM)&tb);
+
+    /* Ajouter les chaînes de caractères pour les boutons */
+    SendMessageA(ctx->hwnd_toolbar, TB_ADDSTRINGS, 0, (LPARAM)"Nouveau\0Ouvrir\0Sauv.\0Annuler\0Rétablir\0G\0I\0S\0Corriger\0Ref.\0\0");
+
+    /* Boutons de la barre d'outils */
     TBBUTTON tbb[] = {
-        {STD_FILENEW, ID_FILE_NEW, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, 0},
-        {STD_FILEOPEN, ID_FILE_OPEN, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, 0},
-        {STD_FILESAVE, ID_FILE_SAVE, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, 0},
+        {STD_FILENEW,  ID_FILE_NEW,      TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 0},
+        {STD_FILEOPEN, ID_FILE_OPEN,     TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 1},
+        {STD_FILESAVE, ID_FILE_SAVE,     TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 2},
         {0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0},
-        {STD_UNDO, ID_EDIT_UNDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, 0},
-        {STD_REDOW, ID_EDIT_REDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, 0},
+        {STD_UNDO,     ID_EDIT_UNDO,     TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 3},
+        {STD_REDOW,    ID_EDIT_REDO,     TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 4},
+        {0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0},
+        {STD_CUT,      ID_EDIT_BOLD,     TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 5},
+        {STD_COPY,     ID_EDIT_ITALIC,   TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 6},
+        {STD_PASTE,    ID_EDIT_UNDERLINE,TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 7},
+        {0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0},
+        {STD_PROPERTIES, ID_TOOLS_CORRECT, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 8},
+        {STD_FIND,     ID_TOOLS_REFORMULATE, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_SHOWTEXT, {0}, 0, 9},
     };
-    SendMessage(ctx->hwnd_toolbar, TB_ADDBUTTONS, 6, (LPARAM)tbb);
-    SendMessage(ctx->hwnd_toolbar, TB_AUTOSIZE, 0, 0); return true;
+
+    SendMessage(ctx->hwnd_toolbar, TB_ADDBUTTONS, sizeof(tbb)/sizeof(TBBUTTON), (LPARAM)tbb);
+    SendMessage(ctx->hwnd_toolbar, TB_AUTOSIZE, 0, 0); 
+    return true;
 }
 
 static bool create_statusbar(AppContext *ctx) {

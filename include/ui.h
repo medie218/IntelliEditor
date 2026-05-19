@@ -36,8 +36,14 @@
 #define ID_EDIT_CUT         1103
 #define ID_EDIT_COPY        1104
 #define ID_EDIT_PASTE       1105
+#define ID_EDIT_BOLD        1110
+#define ID_EDIT_ITALIC      1111
+#define ID_EDIT_UNDERLINE   1112
 #define ID_TOOLS_RULES_LOAD 1201
 #define ID_TOOLS_GRAMMAR    1202
+#define ID_TOOLS_CORRECT    1203
+#define ID_TOOLS_REFORMULATE 1204
+#define ID_TOOLS_LLM_TOGGLE 1205
 #define ID_RULES_PANEL      1301
 
 /* Messages personnalisés */
@@ -61,6 +67,7 @@ typedef struct {
     RuleSet        *active_rules;
     LlmEngine      *llm_engine;
     bool            llm_ready;
+    bool            llm_enabled;
 } AppContext;
 
 /* ============================================================================
