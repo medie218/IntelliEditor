@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ===================================================================== * GAP BUFFER — INTERNAL
+/* ============================================================================
+ * GAP BUFFER — INTERNAL
  * ============================================================================ */
 
 static bool gap_buffer_ensure_gap(GapBuffer *gb, size_t needed) {
@@ -57,7 +58,8 @@ static void gap_buffer_move_gap(GapBuffer *gb, size_t pos) {
     }
 }
 
-/* ===================================================================== * LIFECYCLE
+/* ============================================================================
+ * LIFECYCLE
  * ============================================================================ */
 
 EditorDocument *editor_create(void) {
@@ -96,7 +98,8 @@ void editor_destroy(EditorDocument *doc) {
     free(doc);
 }
 
-/* ===================================================================== * TEXT OPERATIONS
+/* ============================================================================
+ * TEXT OPERATIONS
  * ============================================================================ */
 
 bool editor_insert(EditorDocument *doc, const char *text, size_t length) {
@@ -191,7 +194,54 @@ size_t editor_get_length(const EditorDocument *doc) {
     return doc->gap.capacity - (doc->gap.gap_end - doc->gap.gap_start);
 }
 
-/* ===================================================================== * UNDO / REDO
+/* ============================================================================
+ * SEARCH / REPLACE
+ * ============================================================================ */
+
+size_t editor_search(const EditorDocument *doc, const char *query, size_t start_pos) {
+    if (!doc || !query || *query == '\0') return SIZE_MAX;
+
+    char *text = editor_get_text(doc);
+    if (!text) return SIZE_MAX;
+
+    size_t len = strlen(text);
+    if (start_pos >= len) {
+        free(text);
+        return SIZE_MAX;
+    }
+
+    char *found = strstr(text + start_pos, query);
+    size_t res = SIZE_MAX;
+    if (found) {
+        res = (size_t)(found - text);
+    }
+
+    free(text);
+    return res;
+}
+
+bool editor_replace(EditorDocument *doc, size_t pos, size_t len, const char *new_text) {
+    if (!doc || !new_text) return false;
+
+    /* Vérifier les bornes */
+    size_t doc_len = editor_get_length(doc);
+    if (pos + len > doc_len) return false;
+
+    /* 
+     * Pour une implémentation simple et robuste avant la deadline, 
+     * on combine delete + insert.
+     * Note: cela crée deux entrées dans l'historique undo.
+     */
+    if (len > 0) {
+        if (!editor_delete(doc, pos, len)) return false;
+    }
+
+    editor_move_cursor(doc, pos);
+    return editor_insert(doc, new_text, strlen(new_text));
+}
+
+/* ============================================================================
+ * UNDO / REDO
  * ============================================================================ */
 
 bool editor_undo(EditorDocument *doc) {
@@ -254,7 +304,8 @@ bool editor_can_redo(const EditorDocument *doc) {
     return doc && doc->history.redo_top >= 0;
 }
 
-/* ===================================================================== * STATS
+/* ============================================================================
+ * STATS
  * ============================================================================ */
 
 void editor_compute_stats(const EditorDocument *doc, DocStats *stats) {
@@ -294,35 +345,4 @@ void editor_compute_stats(const EditorDocument *doc, DocStats *stats) {
     stats->paragraph_count++;
 
     free(text);
-}
-
-
-/* safer gap resize helper */
-static bool patched_gap_resize(
-    GapBuffer *gb,
-    size_t new_size
-) {
-    char *new_buf = malloc(new_size);
-
-    if (!new_buf)
-        return false;
-
-    memcpy(new_buf, gb->buf, gb->gap_start);
-
-    size_t tail_size = gb->capacity - gb->gap_end;
-    size_t new_gap_end = new_size - tail_size;
-
-    memcpy(
-        new_buf + new_gap_end,
-        gb->buf + gb->gap_end,
-        tail_size
-    );
-
-    free(gb->buf);
-
-    gb->buf = new_buf;
-    gb->gap_end = new_gap_end;
-    gb->capacity = new_size;
-
-    return true;
 }

@@ -3,8 +3,10 @@
  * @brief Pipeline NLP complet — CORE / nlp
  * @author DEV-C
  *
- * ========================================================= * RÔLE DE CE FICHIER
- * ========================================================= * Ce fichier orchestre le pipeline NLP complet :
+ * ================================================================
+ * RÔLE DE CE FICHIER
+ * ================================================================
+ * Ce fichier orchestre le pipeline NLP complet :
  *   1. Correction orthographique (Hunspell — synchrone)
  *   2. Vérification ponctuation française (règles codées)
  *   3. Détection répétitions de mots
@@ -17,7 +19,8 @@
  * INTÉGRATION :
  *   Quand DEV-B livre son code → décommenter ui_apply_nlp_markers()
  *   Quand DEV-D livre son code → décommenter rules_update_llm_result()
- * ========================================================= */
+ * ================================================================
+ */
 
 #include "nlp.h"
 #include "llm.h"
@@ -27,7 +30,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-/* ========================================================= * LISTE DES ANGLICISMES COURANTS À DÉTECTER
+/* ================================================================
+ * LISTE DES ANGLICISMES COURANTS À DÉTECTER
  * ================================================================ */
 static const char *ANGLICISMES[] = {
     "mail", "email", "meeting", "deadline", "feedback",
@@ -36,7 +40,8 @@ static const char *ANGLICISMES[] = {
     NULL
 };
 
-/* ========================================================= * FONCTIONS PRIVÉES
+/* ================================================================
+ * FONCTIONS PRIVÉES
  * ================================================================ */
 
 /**
@@ -116,7 +121,7 @@ static void detect_repetitions(const char *text,
                     err->type   = NLP_ERROR_REPETITION;
                     err->start  = word_start;
                     err->length = word_len;
-                    strncpy(err->original, word, NLP_MAX_WORD_LEN - 1); /* patched */
+                    strncpy(err->original, word, NLP_MAX_WORD_LEN - 1);
                     snprintf(err->message, sizeof(err->message),
                         "Répétition : '%s' déjà utilisé récemment "
                         "(position %zu)", word, last_pos[j]);
@@ -126,7 +131,7 @@ static void detect_repetitions(const char *text,
             }
 
             /* Enregistrer ce mot */
-            strncpy(last_words[word_idx % 5], word, NLP_MAX_WORD_LEN - 1); /* patched */
+            strncpy(last_words[word_idx % 5], word, NLP_MAX_WORD_LEN - 1);
             last_pos[word_idx % 5] = word_start;
             word_idx++;
             word_len = 0;
@@ -164,7 +169,7 @@ static void detect_anglicisms(const char *text,
                     err->type   = NLP_ERROR_ANGLICISM;
                     err->start  = word_start;
                     err->length = word_len;
-                    strncpy(err->original, word, NLP_MAX_WORD_LEN - 1); /* patched */
+                    strncpy(err->original, word, NLP_MAX_WORD_LEN - 1);
                     snprintf(err->message, sizeof(err->message),
                         "Anglicisme détecté : '%s' — "
                         "préférer un équivalent français", word);
@@ -179,7 +184,8 @@ static void detect_anglicisms(const char *text,
 }
 
 
-/* ========================================================= * API PUBLIQUE
+/* ================================================================
+ * API PUBLIQUE
  * ================================================================ */
 
 /**

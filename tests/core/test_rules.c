@@ -1,29 +1,6 @@
 /**
  * @file test_rules.c
  * @brief Tests unitaires du moteur de règles — cmocka
- *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Ce fichier teste :
- *   - La création/destruction des structures (RuleSet, RuleReport)
- *   - L’évaluation des règles structurelles (sections, comptage)
- *   - Le comportement des règles LLM (toujours RULE_STATUS_PENDING)
- *   - La mise à jour des résultats LLM
- *
- * =============================================================================
- * DEV-D (Ehud) — Notes d’architecture
- * =============================================================================
- * - Ce fichier sert de documentation vivante pour le moteur de règles.
- * - Les tests sont organisés par catégories :
- *      1. Cycle de vie
- *      2. Évaluation
- *      3. LLM
- *      4. Utilitaires
- *
- * - Certains tests restent TODO tant que les checkers ne sont pas complets.
- *
- * =============================================================================
  */
 
 #include <stdarg.h>

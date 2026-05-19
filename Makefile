@@ -27,17 +27,8 @@
 # -----------------------------------------------------------------------------
 
 CC      = gcc
-PATH := /c/msys64/ucrt64/bin:/c/msys64/mingw64/bin:/usr/bin:/bin:$(PATH)
-export PATH
-
-TMP ?= /c/msys64/tmp
-TEMP ?= /c/msys64/tmp
-TMPDIR ?= /c/msys64/tmp
-export TMP TEMP TMPDIR
-
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -Wno-unused-parameter
 CFLAGS += -Iinclude
-CFLAGS += -Iscintilla/include
 CFLAGS += -g  # Symboles de debug (à retirer en release avec -O2)
 
 # Chemins d'inclusion supplémentaires (optionnel, à passer en ligne de commande)
@@ -55,7 +46,7 @@ LIBS    = -lcomctl32 -lcomdlg32 -lgdi32 -luser32 -lkernel32
 # Usage : make ENABLE_HUNSPELL=1 ENABLE_LLAMA=1 etc.
 ENABLE_HUNSPELL ?= 0
 ENABLE_LLAMA    ?= 0
-ENABLE_CJSON    ?= 0
+ENABLE_CJSON    ?= 1
 ENABLE_PCRE2    ?= 0
 
 ifeq ($(ENABLE_HUNSPELL),1)
@@ -83,24 +74,9 @@ endif
 # -----------------------------------------------------------------------------
 
 SRC_CORE     = src/core/editor src/core/rules src/core/nlp
-SRC_ADAPTERS = src/adapters/ui_win32 src/adapters/ui_scintilla
-
-ifeq ($(ENABLE_LLAMA),1)
-SRC_ADAPTERS += src/adapters/llm_llama_cpp
-endif
-
-ifeq ($(ENABLE_HUNSPELL),1)
-SRC_ADAPTERS += src/adapters/hunspell_wrap
-endif
-
-ifeq ($(ENABLE_CJSON),1)
-SRC_ADAPTERS += src/adapters/rules_json_cjson
-endif
-
-ifeq ($(ENABLE_PCRE2),1)
-SRC_ADAPTERS += src/adapters/regex_pcre2
-endif
-
+SRC_ADAPTERS = src/adapters/ui_win32 src/adapters/ui_scintilla \
+               src/adapters/llm_llama_cpp src/adapters/hunspell_wrap \
+               src/adapters/rules_json_cjson src/adapters/regex_pcre2
 SRC_INFRA    = src/infra/config_ini src/infra/encoding \
                src/infra/threads src/infra/storage
 
@@ -167,19 +143,25 @@ TEST_LIBS  = -lcmocka $(LIBS)
 ## Compiler et lancer tous les tests
 test: dirs test_editor test_rules test_infra
 
-test_editor: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_editor.o
+STUBS_OBJ = $(BUILD_DIR)/tests/stubs_ui.o
+
+$(STUBS_OBJ): tests/stubs_ui.c
+	@mkdir -p $(BUILD_DIR)/tests
+	$(CC) $(TEST_FLAGS) -c -o $@ $<
+
+test_editor: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_editor.o $(STUBS_OBJ)
 	@echo "[LINK] test_editor"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_editor.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_editor"
 	@$(BIN_DIR)/test_editor.exe || true
 
-test_rules: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_rules.o
+test_rules: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_rules.o $(STUBS_OBJ)
 	@echo "[LINK] test_rules"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_rules.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_rules"
 	@$(BIN_DIR)/test_rules.exe || true
 
-test_infra: $(OBJS_LIB) $(BUILD_DIR)/tests/infra/test_infra.o
+test_infra: $(OBJS_LIB) $(BUILD_DIR)/tests/infra/test_infra.o $(STUBS_OBJ)
 	@echo "[LINK] test_infra"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_infra.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_infra"
@@ -205,7 +187,7 @@ $(BUILD_DIR)/tests/infra/test_infra.o: tests/infra/test_infra.c
 clean:
 	@echo "[CLEAN] Suppression de build/ et bin/"
 	rm -rf $(BUILD_DIR) $(BIN_DIR)
-	@echo " Nettoyage terminé"
+	@echo "✅ Nettoyage terminé"
 
 # -----------------------------------------------------------------------------
 # AIDE
