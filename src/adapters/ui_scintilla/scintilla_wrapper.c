@@ -1,47 +1,27 @@
 /**
  * @file scintilla_wrapper.c
  * @brief Wrapper Scintilla — ADAPTER / ui_scintilla
- *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Encapsule toute la communication avec le contrôle Scintilla.
- * Scintilla est le composant d'édition avancé utilisé par Notepad++ et CLion.
- *
- * PRINCIPE IMPORTANT :
- *   Scintilla est UN AFFICHEUR, pas la source de vérité du texte.
- *   Le texte "réel" est dans le gap buffer (EditorDocument).
- *   Scintilla affiche ce texte et reçoit les frappes clavier.
- *   Les modifications clavier sont interceptées via SCN_MODIFIED et
- *   répercutées dans le gap buffer.
- *
- * COMMUNICATION AVEC SCINTILLA :
- *   Scintilla utilise des messages Windows (SendMessage) pour tout.
- *   Les constantes commencent par SCI_ (ex: SCI_SETTEXT, SCI_GETTEXT).
- *
- *   Deux façons de communiquer :
- *   1. SendMessage(hwnd, SCI_XXX, wParam, lParam) — plus portable
- *   2. Appel direct via SciFnDirect (plus rapide, évite le dispatch Win32)
- *
- * CHARGEMENT :
- *   Scintilla est une DLL (SciLexer.dll ou Scintilla.dll).
- *   Elle s'enregistre comme classe de contrôle Win32 appelée "Scintilla".
- *
- *   Étapes :
- *   1. LoadLibrary("SciLexer.dll")
- *   2. CreateWindow("Scintilla", ...)
- *   3. Configurer les styles, les couleurs, les indicateurs
- *
- * RESPONSABLE : DEV-B
- * =============================================================================
  */
 
 #include <windows.h>
-#include "ui.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "ui.h"
 #include "Scintilla.h"
-#include "SciLexer.h"   // TODO-SCI-001 : inclure les vrais headers
+#include "SciLexer.h"
+
+/* Couleurs Thème Sombre (One Dark Inspired) */
+#define THEME_BG          RGB(40, 44, 52)
+#define THEME_FG          RGB(171, 178, 191)
+#define THEME_LINENUM_FG  RGB(76, 82, 99)
+#define THEME_LINENUM_BG  RGB(40, 44, 52)
+#define THEME_SEL_BG      RGB(62, 68, 81)
+#define THEME_CURSOR      RGB(82, 139, 255)
+#define THEME_COMMENT     RGB(92, 99, 112)
+#define THEME_STRING      RGB(152, 195, 121)
+#define THEME_KEYWORD     RGB(198, 120, 221)
+#define THEME_NUMBER      RGB(209, 154, 102)
 
 /* Handle vers la DLL Scintilla */
 static HMODULE g_scintilla_dll = NULL;
@@ -50,7 +30,7 @@ static HMODULE g_scintilla_dll = NULL;
  * @brief Charge la DLL Scintilla et enregistre la classe de contrôle.
  */
 bool scintilla_load(void) {
-    if (g_scintilla_dll) return true; /* Déjà chargé */
+    if (g_scintilla_dll) return true;
 
     g_scintilla_dll = LoadLibraryA("SciLexer.dll");
     if (!g_scintilla_dll) {
@@ -58,39 +38,58 @@ bool scintilla_load(void) {
     }
 
     if (!g_scintilla_dll) {
-        /* TODO-SCI-002 : chercher dans config.ini */
-        char path[MAX_PATH];
-        GetPrivateProfileStringA("Editor", "scintilla_path", "", path, MAX_PATH, "config.ini");
-        if (strlen(path) > 0) {
-            g_scintilla_dll = LoadLibraryA(path);
-        }
-    }
-
-    if (!g_scintilla_dll) {
         fprintf(stderr, "[ERROR] Impossible de charger SciLexer.dll ou Scintilla.dll\n");
-        fprintf(stderr, "[INFO]  Placez la DLL dans le même dossier que IntelliEditor.exe\n");
-        fprintf(stderr, "[INFO]  Téléchargement : https://www.scintilla.org/\n");
         return false;
     }
 
-    printf("[INFO] Scintilla chargé avec succès\n");
     return true;
 }
 
 /**
- * @brief Configure les paramètres par défaut de Scintilla.
+ * @brief Configure les paramètres par défaut de Scintilla avec un thème sombre.
  */
 void scintilla_configure_defaults(HWND sci) {
+    /* Mode UTF-8 pour Scintilla */
+    SendMessageA(sci, SCI_SETCODEPAGE, SC_CP_UTF8, 0);
+
     /* Retour à la ligne automatique */
     SendMessageA(sci, SCI_SETWRAPMODE, SC_WRAP_WORD, 0);
-    /* Numéros de ligne (marge 0, largeur 40px) */
-    SendMessageA(sci, SCI_SETMARGINWIDTHN, 0, 40);
-    /* Police Consolas 12pt */
-    SendMessageA(sci, SCI_STYLESETFONT, 32, (LPARAM)"Consolas");
-    SendMessageA(sci, SCI_STYLESETSIZE, 32, 12);
-    /* Indicateur 0 : fautes ortho (rouge squiggle) */
+
+    /* --- THÈME ET STYLES --- */
+
+    /* Style par défaut (Hérité par tous les autres) */
+    SendMessageA(sci, SCI_STYLESETFONT, STYLE_DEFAULT, (LPARAM)"Consolas");
+    SendMessageA(sci, SCI_STYLESETSIZE, STYLE_DEFAULT, 11);
+    SendMessageA(sci, SCI_STYLESETBACK, STYLE_DEFAULT, THEME_BG);
+    SendMessageA(sci, SCI_STYLESETFORE, STYLE_DEFAULT, THEME_FG);
+    SendMessageA(sci, SCI_STYLECLEARALL, 0, 0);
+
+    /* Marge des numéros de ligne (marge 0) */
+    SendMessageA(sci, SCI_SETMARGINWIDTHN, 0, 45);
+    SendMessageA(sci, SCI_STYLESETBACK, STYLE_LINENUMBER, THEME_LINENUM_BG);
+    SendMessageA(sci, SCI_STYLESETFORE, STYLE_LINENUMBER, THEME_LINENUM_FG);
+
+    /* Curseur et Sélection */
+    SendMessageA(sci, SCI_SETCARETFORE, THEME_CURSOR, 0);
+    SendMessageA(sci, SCI_SETSELBACK, 1, THEME_SEL_BG);
+
+    /* Marge de séparation */
+    SendMessageA(sci, SCI_SETMARGINWIDTHN, 1, 1);
+    SendMessageA(sci, SCI_SETMARGINSENSITIVEN, 1, 0);
+
+    /* --- INDICATEURS (NLP/Règles) --- */
+
+    // 0: Erreur Critique (Rouge - Orthographe/Règle cassée)
     SendMessageA(sci, SCI_INDICSETSTYLE, 0, INDIC_SQUIGGLE);
-    SendMessageA(sci, SCI_INDICSETFORE,  0, RGB(220,50,47));
+    SendMessageA(sci, SCI_INDICSETFORE,  0, RGB(224, 108, 117)); // Soft Red
+
+    // 1: Avertissement (Jaune - Grammaire)
+    SendMessageA(sci, SCI_INDICSETSTYLE, 1, INDIC_SQUIGGLE);
+    SendMessageA(sci, SCI_INDICSETFORE,  1, RGB(229, 192, 123)); // Soft Yellow
+
+    // 2: Info/Style (Bleu - NLP)
+    SendMessageA(sci, SCI_INDICSETSTYLE, 2, INDIC_SQUIGGLE);
+    SendMessageA(sci, SCI_INDICSETFORE,  2, RGB(97, 175, 239)); // Soft Blue
 }
 
 /**
@@ -98,86 +97,61 @@ void scintilla_configure_defaults(HWND sci) {
  */
 HWND scintilla_create(HWND parent, HINSTANCE hi, int x, int y, int w, int h) {
     if (!scintilla_load()) return NULL;
- 
+
     HWND hwnd = CreateWindowExA(
         0, "Scintilla", "",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN,
         x, y, w, h,
         parent, NULL, hi, NULL
     );
-    if (!hwnd) return NULL;
-    scintilla_configure_defaults(hwnd);
+
+    if (hwnd) {
+        scintilla_configure_defaults(hwnd);
+    }
     return hwnd;
 }
 
-/**
- * @brief Envoie un texte UTF-8 vers Scintilla.
- */
-void scintilla_set_text(HWND hwnd_sci, const char *text) {
-    if (!hwnd_sci || !text) return;
-    SendMessageA(hwnd_sci, SCI_SETTEXT, 0, (LPARAM)text);
-}
+/* ============================================================================
+ * IMPLEMENTATION DES FONCTIONS DE ui.h
+ * ============================================================================ */
 
-/**
- * @brief Lit le texte actuel de Scintilla.
- */
-char *scintilla_get_text(HWND hwnd_sci) {
-    if (!hwnd_sci) return NULL;
-
-    LRESULT len = SendMessageA(hwnd_sci, SCI_GETLENGTH, 0, 0);
-    char *buf = malloc((size_t)(len + 1));
-    if (!buf) return NULL;
-
-    SendMessageA(hwnd_sci, SCI_GETTEXT, (WPARAM)(len + 1), (LPARAM)buf);
-    return buf;
-}
-
-/**
- * @brief Positionne le curseur Scintilla à une position donnée.
- */
-void scintilla_goto_pos(HWND hwnd_sci, size_t pos) {
-    if (!hwnd_sci) return;
-    SendMessageA(hwnd_sci, SCI_GOTOPOS, (WPARAM)pos, 0);
-}
-
-/**
- * @brief Applique les marqueurs NLP sur l'éditeur Scintilla.
- */
-void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
-    if (!ctx->hwnd_scintilla || !result) return;
-    HWND sci = ctx->hwnd_scintilla;
- 
-    /* Effacer les anciens marqueurs */
-    SendMessageA(sci, SCI_SETINDICATORCURRENT, 0, 0);
-    SendMessageA(sci, SCI_INDICATORCLEARRANGE, 0,
-        SendMessageA(sci, SCI_GETLENGTH, 0, 0));
- 
-    /* Appliquer les nouveaux marqueurs */
-    for (size_t i = 0; i < result->error_count; i++) {
-        const NlpError *err = &result->errors[i];
-        /* Choisir l'indicateur selon le type d'erreur */
-        int indicator = (err->type == NLP_ERROR_SPELLING) ? 0 : 1;
-        SendMessageA(sci, SCI_SETINDICATORCURRENT, indicator, 0);
-        SendMessageA(sci, SCI_INDICATORFILLRANGE,
-            (WPARAM)err->start, (LPARAM)err->length);
-    }
-}
-
-/**
- * @brief Synchronise le texte de l'éditeur avec Scintilla.
- */
 void ui_sync_text(AppContext *ctx) {
-    if (!ctx || !ctx->doc || !ctx->hwnd_scintilla) return;
- 
+    if (!ctx || !ctx->hwnd_scintilla || !ctx->doc) return;
+
+    /* On récupère le texte du Core */
     char *text = editor_get_text(ctx->doc);
     if (!text) return;
- 
-    /* Envoyer le texte à Scintilla */
+
+    /* On l'envoie à Scintilla */
     SendMessageA(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
     free(text);
- 
-    /* Mettre à jour la barre de statut */
+
+    /* Mise à jour des stats dans la barre de statut */
     DocStats stats;
     editor_compute_stats(ctx->doc, &stats);
     ui_update_statusbar(ctx, stats.word_count, 0, 0);
+}
+
+void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
+    if (!ctx || !ctx->hwnd_scintilla || !result) return;
+    HWND sci = ctx->hwnd_scintilla;
+
+    /* 1. Effacer tous les indicateurs existants */
+    LRESULT total_len = SendMessageA(sci, SCI_GETLENGTH, 0, 0);
+    for (int ind = 0; ind <= 2; ind++) {
+        SendMessageA(sci, SCI_SETINDICATORCURRENT, ind, 0);
+        SendMessageA(sci, SCI_INDICATORCLEARRANGE, 0, total_len);
+    }
+
+    /* 2. Appliquer les nouveaux marqueurs */
+    for (size_t i = 0; i < result->error_count; i++) {
+        const NlpError *err = &result->errors[i];
+
+        int indicator = 0; // Défaut : orthographe
+        if (err->type == NLP_ERROR_GRAMMAR)     indicator = 1;
+        else if (err->type == NLP_ERROR_STYLE) indicator = 2;
+
+        SendMessageA(sci, SCI_SETINDICATORCURRENT, indicator, 0);
+        SendMessageA(sci, SCI_INDICATORFILLRANGE, (WPARAM)err->start, (LPARAM)err->length);
+    }
 }

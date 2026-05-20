@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "document_type": "Rédaction Générale (Français)",
+    "version": "1.0",
+    "author": "IntelliEditor Universal",
+    "description": "Règles universelles pour la rédaction structurée en français."
+  },
+  "rules": [
+    {
+      "id": "FR_PUNCT_SPACE",
+      "category": "typographie",
+      "severity": "warning",
+      "description": "Espace obligatoire avant les signes de ponctuation doubles (: ; ! ?)",
+      "check_type": "regex_forbidden",
+      "parameter": "([^\\s])[:;!?]",
+      "flags": {"case_insensitive": false}
+    },
+    {
+      "id": "FR_JE_EVITER",
+      "category": "style",
+      "severity": "info",
+      "description": "L'usage du 'Je' est souvent déconseillé dans les rapports académiques.",
+      "check_type": "regex_forbidden",
+      "parameter": "\\b[Jj]e\\b",
+      "flags": {"case_insensitive": false}
+    },
+    {
+      "id": "FR_INTRO_PRESENT",
+      "category": "structure",
+      "severity": "error",
+      "description": "Le document doit commencer par une Introduction.",
+      "check_type": "section_exists",
+      "parameter": "Introduction"
+    },
+    {
+      "id": "FR_CONCL_PRESENT",
+      "category": "structure",
+      "severity": "error",
+      "description": "Une Conclusion est indispensable pour clore le raisonnement.",
+      "check_type": "section_exists",
+      "parameter": "Conclusion"
+    },
+    {
+      "id": "FR_LONGUEUR_MIN",
+      "category": "longueur",
+      "severity": "warning",
+      "description": "Le document doit faire au moins 100 mots.",
+      "check_type": "word_count_min",
+      "parameter": { "min_words": 100 }
+    }
+  ]
+}

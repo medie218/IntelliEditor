@@ -143,19 +143,25 @@ TEST_LIBS  = -lcmocka $(LIBS)
 ## Compiler et lancer tous les tests
 test: dirs test_editor test_rules test_infra
 
-test_editor: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_editor.o
+STUBS_OBJ = $(BUILD_DIR)/tests/stubs_ui.o
+
+$(STUBS_OBJ): tests/stubs_ui.c
+	@mkdir -p $(BUILD_DIR)/tests
+	$(CC) $(TEST_FLAGS) -c -o $@ $<
+
+test_editor: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_editor.o $(STUBS_OBJ)
 	@echo "[LINK] test_editor"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_editor.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_editor"
 	@$(BIN_DIR)/test_editor.exe || true
 
-test_rules: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_rules.o
+test_rules: $(OBJS_LIB) $(BUILD_DIR)/tests/core/test_rules.o $(STUBS_OBJ)
 	@echo "[LINK] test_rules"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_rules.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_rules"
 	@$(BIN_DIR)/test_rules.exe || true
 
-test_infra: $(OBJS_LIB) $(BUILD_DIR)/tests/infra/test_infra.o
+test_infra: $(OBJS_LIB) $(BUILD_DIR)/tests/infra/test_infra.o $(STUBS_OBJ)
 	@echo "[LINK] test_infra"
 	$(CC) $(TEST_FLAGS) -o $(BIN_DIR)/test_infra.exe $^ $(TEST_LIBS)
 	@echo "[RUN]  test_infra"

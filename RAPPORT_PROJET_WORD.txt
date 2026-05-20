@@ -1,0 +1,58 @@
+=============================================================================
+RAPPORT TECHNIQUE : PROJET INTELLIEDITOR
+=============================================================================
+
+1. INTRODUCTION
+---------------
+IntelliEditor est un éditeur de texte intelligent développé en C11, conçu pour les besoins académiques (rédaction de mémoires, thèses). Sa particularité réside dans l'intégration locale d'un moteur de règles métier et d'une Intelligence Artificielle (LLM), tout en garantissant une autonomie complète (100% offline).
+
+2. ARCHITECTURE TECHNIQUE
+-------------------------
+Le projet repose sur une "Architecture Hexagonale" (Ports & Adapters). Cette structure permet de séparer la logique métier des détails techniques et des bibliothèques externes.
+
+A. Le CORE (Cœur Métier) :
+   - Editor : Gestion du texte via une structure de données "Gap Buffer" (optimisée pour les insertions/suppressions fréquentes).
+   - Rules : Moteur d'évaluation permettant de vérifier la conformité du document par rapport à un référentiel (ex: présence de sections, limites de mots).
+   - NLP : Définition des interfaces pour la correction orthographique et l'analyse sémantique.
+   - Caractéristique : Aucun appel à des fonctions système Windows ou bibliothèques externes. 100% portable et testable.
+
+B. Les ADAPTERS (Interfaces) :
+   - UI Win32 : Interface graphique native Windows (fenêtres, menus, barres d'outils).
+   - Scintilla : Intégration du composant d'édition professionnel pour la gestion de l'affichage et du texte riche.
+   - LLM llama.cpp : Intégration de modèles d'IA locaux pour l'assistance à la rédaction.
+   - Hunspell : Moteur de correction orthographique.
+   - Rules JSON : Parser permettant de charger les règles de conformité depuis des fichiers JSON.
+
+C. L'INFRASTRUCTURE (Fondations) :
+   - Gestion de la configuration (fichiers .ini).
+   - Encodage des caractères (Conversion UTF-8 / UTF-16).
+   - Abstraction des threads (gestion asynchrone pour ne pas bloquer l'UI).
+   - Storage : Lecture et écriture des fichiers (TXT, RTF).
+
+3. STRUCTURE DU PROJET (RÉPERTOIRES)
+------------------------------------
+/include  : Fichiers d'en-tête (.h) définissant les contrats et les ports.
+/src      : Code source (.c)
+  /core     : Logique métier (editor, rules, nlp).
+  /adapters : Implémentations concrètes (ui, llm, dictionnaire, etc.).
+  /infra    : Services techniques (threads, config, encodage).
+/tests    : Tests unitaires utilisant la bibliothèque cmocka.
+/bin      : Exécutables générés (IntelliEditor.exe, test_editor.exe).
+/build    : Fichiers objets temporaires de compilation.
+/data     : Modèles de règles et ressources.
+
+4. FONCTIONNEMENT DES FLUX PRINCIPAUX
+-------------------------------------
+- Édition : Chaque frappe est capturée par Scintilla, puis synchronisée avec le Gap Buffer du Core. Les opérations d'Undo/Redo sont gérées par une pile de commandes.
+- Vérification : Le moteur de règles analyse périodiquement le contenu du Gap Buffer. Il compare la structure détectée (titres, sections) aux règles chargées et remplit un rapport de conformité affiché dans le panneau latéral.
+- Assistance IA : Les requêtes lourdes (correction de style) sont envoyées à un thread "Worker" séparé. Cela permet à l'utilisateur de continuer à taper pendant que l'IA génère sa réponse. Une fois terminée, la réponse est renvoyée à l'UI via un message système.
+
+5. ÉTAT DE DÉVELOPPEMENT ET COMPILATION
+---------------------------------------
+- Statut : Le projet est fonctionnel et compile sous MSYS2/MinGW64.
+- Tests : Une suite de tests unitaires valide le bon fonctionnement du Core et de l'Infra.
+- Dépendances : Le système est conçu pour être modulaire. Si une bibliothèque (comme cJSON pour le JSON complexe) est absente, le système bascule automatiquement sur des modes simplifiés ou des stubs sécurisés pour garantir la stabilité.
+
+=============================================================================
+Rapport généré le 19 mai 2026.
+=============================================================================

@@ -1,0 +1,4 @@
+  Supported emulations:
+   i386pep
+   i386pe
+collect2.exe: error: ld returned 1 exit status
