@@ -10,7 +10,7 @@
  * RESPONSABLE : DEV-A
  */
 
-#include "../../include/config.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +31,7 @@ bool config_load(AppConfig *cfg, const char *filepath) {
     if (!cfg || !filepath) return false;
     memset(cfg, 0, sizeof(AppConfig));
     strncpy(cfg->filepath, filepath, 511);
+    cfg->filepath[511] = '\0';
 
     FILE *f = fopen(filepath, "r");
     if (!f) {
@@ -64,6 +65,7 @@ bool config_load(AppConfig *cfg, const char *filepath) {
             if (end) {
                 *end = '\0';
                 strncpy(current_section, line + 1, CONFIG_MAX_SECTION_LEN - 1);
+                current_section[CONFIG_MAX_SECTION_LEN - 1] = '\0';
                 trim(current_section);
             }
             continue;
@@ -76,7 +78,9 @@ bool config_load(AppConfig *cfg, const char *filepath) {
             char key[CONFIG_MAX_KEY_LEN]     = "";
             char value[CONFIG_MAX_VALUE_LEN] = "";
             strncpy(key,   line, CONFIG_MAX_KEY_LEN - 1);
+            key[CONFIG_MAX_KEY_LEN - 1] = '\0';
             strncpy(value, eq + 1, CONFIG_MAX_VALUE_LEN - 1);
+            value[CONFIG_MAX_VALUE_LEN - 1] = '\0';
             trim(key);
             trim(value);
             config_set(cfg, current_section, key, value);
@@ -135,6 +139,7 @@ void config_set(AppConfig *cfg,
         if (strcmp(cfg->entries[i].section, section) == 0 &&
             strcmp(cfg->entries[i].key,     key)     == 0) {
             strncpy(cfg->entries[i].value, value, CONFIG_MAX_VALUE_LEN - 1);
+            cfg->entries[i].value[CONFIG_MAX_VALUE_LEN - 1] = '\0';
             return;
         }
     }
@@ -147,8 +152,11 @@ void config_set(AppConfig *cfg,
 
     ConfigEntry *e = &cfg->entries[cfg->count++];
     strncpy(e->section, section, CONFIG_MAX_SECTION_LEN - 1);
+    e->section[CONFIG_MAX_SECTION_LEN - 1] = '\0';
     strncpy(e->key,     key,     CONFIG_MAX_KEY_LEN     - 1);
+    e->key[CONFIG_MAX_KEY_LEN     - 1] = '\0';
     strncpy(e->value,   value,   CONFIG_MAX_VALUE_LEN   - 1);
+    e->value[CONFIG_MAX_VALUE_LEN   - 1] = '\0';
 }
 
 int config_get_int(const AppConfig *cfg,
@@ -159,3 +167,4 @@ int config_get_int(const AppConfig *cfg,
     if (!val) return default_val;
     return atoi(val);
 }
+

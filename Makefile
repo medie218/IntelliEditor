@@ -31,6 +31,10 @@ CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -Wno-unused-parameter
 CFLAGS += -Iinclude
 CFLAGS += -g  # Symboles de debug (à retirer en release avec -O2)
 
+# Chemins d'inclusion supplémentaires (optionnel, à passer en ligne de commande)
+# Exemple : make EXTRA_INCLUDES=-Iscintilla/include test
+EXTRA_INCLUDES ?=
+
 # Flags Windows (nécessaires pour l'API Win32)
 # -DUNICODE et -D_UNICODE permettent d'utiliser les versions Wide des API Win32
 WFLAGS  = -DWIN32_LEAN_AND_MEAN -DUNICODE -D_UNICODE
@@ -38,11 +42,32 @@ WFLAGS  = -DWIN32_LEAN_AND_MEAN -DUNICODE -D_UNICODE
 # Bibliothèques de liaison
 LIBS    = -lcomctl32 -lcomdlg32 -lgdi32 -luser32 -lkernel32
 
-# TODO [DEV-A / TODO-MAKE-001] : décommenter au fur et à mesure
-# LIBS  += -lcjson          # Quand rules_json_cjson sera actif
-# LIBS  += -lpcre2-8        # Quand regex_pcre2 sera actif
-# LIBS  += -lhunspell-1.7   # Quand hunspell_wrap sera actif
-# LIBS  += -lllama          # Quand llm_llama_cpp sera actif
+# ── Adapters externes optionnels ──────────────────────────────
+# Usage : make ENABLE_HUNSPELL=1 ENABLE_LLAMA=1 etc.
+ENABLE_HUNSPELL ?= 0
+ENABLE_LLAMA    ?= 0
+ENABLE_CJSON    ?= 0
+ENABLE_PCRE2    ?= 0
+
+ifeq ($(ENABLE_HUNSPELL),1)
+    LIBS   += -lhunspell-1.7
+    CFLAGS += -DHAVE_HUNSPELL
+endif
+
+ifeq ($(ENABLE_LLAMA),1)
+    LIBS   += -lstdc++ -lm -lws2_32 -lgomp
+    CFLAGS += -DHAVE_LLAMA
+endif
+
+ifeq ($(ENABLE_CJSON),1)
+    LIBS   += -lcjson
+    CFLAGS += -DHAVE_CJSON
+endif
+
+ifeq ($(ENABLE_PCRE2),1)
+    LIBS   += -lpcre2-8
+    CFLAGS += -DHAVE_PCRE2
+endif
 
 # -----------------------------------------------------------------------------
 # RÉPERTOIRES
@@ -92,14 +117,14 @@ all: dirs $(TARGET)
 
 $(TARGET): $(OBJS_LIB) $(OBJ_MAIN)
 	@echo "[LINK] $@"
-	$(CC) $(CFLAGS) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
-	@echo "✅ Build terminé : $@"
+	$(CC) $(CFLAGS) $(EXTRA_INCLUDES) $(WFLAGS) -o $@ $^ $(LIBS) -mwindows
+	@echo " Build terminé : $@"
 
 ## Compiler un fichier objet
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "[CC]   $<"
-	$(CC) $(CFLAGS) $(WFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(EXTRA_INCLUDES) $(WFLAGS) -c -o $@ $<
 
 ## Créer les répertoires nécessaires
 dirs:
@@ -111,8 +136,8 @@ dirs:
 # TESTS UNITAIRES
 # -----------------------------------------------------------------------------
 
-TEST_SRCS  = $(wildcard tests/**/*.c) $(wildcard tests/*.c)
-TEST_FLAGS = $(CFLAGS) -Iinclude
+TEST_SRCS  = $(wildcard tests/core/*.c) $(wildcard tests/adapters/*.c) $(wildcard tests/infra/*.c) $(wildcard tests/*.c)
+TEST_FLAGS = $(CFLAGS) $(EXTRA_INCLUDES)
 TEST_LIBS  = -lcmocka $(LIBS)
 
 ## Compiler et lancer tous les tests

@@ -1,17 +1,17 @@
 /**
  * @file section_checker.c
  * @brief Vérificateurs de sections — CORE / rules / checkers
- *
- * RESPONSABLE : DEV-D
  */
 
-#include "../../../include/rules.h"
+#include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 
-#include <cjson/cJSON.h>   /* IMPORTANT : nécessaire pour parser rule->parameter */
+#ifdef HAVE_CJSON
+#include <cjson/cJSON.h>
+#endif
 
 /* ============================================================================
  * find_section() — recherche insensible à la casse
@@ -60,11 +60,12 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
     const char *section = rule->parameter;
 
     if (!section || strlen(section) == 0) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre section manquant");
         return result;
@@ -73,11 +74,11 @@ RuleResult check_section_exists(const Rule *rule, const char *text, size_t len) 
     size_t pos = find_section(text, section);
 
     if (pos == SIZE_MAX) {
-        result.status = STATUS_FAIL;
+        result.status = RULE_STATUS_FAIL;
         snprintf(result.message, sizeof(result.message),
                  "Section '%s' introuvable", section);
     } else {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "Section '%s' trouvée", section);
     }
@@ -93,10 +94,17 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
+#ifndef HAVE_CJSON
+    result.status = RULE_STATUS_SKIPPED;
+    snprintf(result.message, sizeof(result.message),
+             "cJSON requis pour section_order (non activé)");
+    return result;
+#else
     cJSON *arr = cJSON_Parse(rule->parameter);
     if (!arr || !cJSON_IsArray(arr)) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre invalide pour section_order");
         if (arr) cJSON_Delete(arr);
@@ -119,7 +127,7 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
             snprintf(result.message, sizeof(result.message),
                      "Section '%s' avant '%s'",
                      item->valuestring,
-                     cJSON_GetArrayItem(arr, i - 1)->valuestring);
+                     i > 0 ? cJSON_GetArrayItem(arr, i - 1)->valuestring : "début");
             break;
         }
 
@@ -129,14 +137,15 @@ RuleResult check_section_order(const Rule *rule, const char *text, size_t len) {
     cJSON_Delete(arr);
 
     if (order_ok) {
-        result.status = STATUS_PASS;
+        result.status = RULE_STATUS_PASS;
         snprintf(result.message, sizeof(result.message),
                  "Ordre des sections correct");
     } else {
-        result.status = STATUS_WARNING;
+        result.status = RULE_STATUS_WARNING;
     }
 
     return result;
+#endif
 }
 
 /* ============================================================================
@@ -147,10 +156,17 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
     RuleResult result;
     memset(&result, 0, sizeof(result));
     strncpy(result.rule_id, rule->id, RULES_MAX_ID_LEN - 1);
+    result.rule_id[RULES_MAX_ID_LEN - 1] = '\0';
 
+#ifndef HAVE_CJSON
+    result.status = RULE_STATUS_SKIPPED;
+    snprintf(result.message, sizeof(result.message),
+             "cJSON requis pour heading_format (non activé)");
+    return result;
+#else
     cJSON *obj = cJSON_Parse(rule->parameter);
     if (!obj || !cJSON_IsObject(obj)) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètre JSON invalide pour heading_format");
         if (obj) cJSON_Delete(obj);
@@ -161,7 +177,7 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
     cJSON *case_item = cJSON_GetObjectItem(obj, "case");
 
     if (!cJSON_IsNumber(level_item) || !cJSON_IsString(case_item)) {
-        result.status = STATUS_ERROR;
+        result.status = RULE_STATUS_ERROR;
         snprintf(result.message, sizeof(result.message),
                  "Paramètres 'level' et 'case' requis pour heading_format");
         cJSON_Delete(obj);
@@ -190,7 +206,7 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
                 for (size_t i = level; i < len_line; i++) {
                     if (isalpha((unsigned char)line[i]) &&
                         !isupper((unsigned char)line[i])) {
-                        result.status = STATUS_FAIL;
+                        result.status = RULE_STATUS_FAIL;
                         snprintf(result.message, sizeof(result.message),
                                  "Titre non en majuscules : %.20s", line);
                         return result;
@@ -202,9 +218,10 @@ RuleResult check_heading_format(const Rule *rule, const char *text, size_t len) 
         line = (*end) ? end + 1 : end;
     }
 
-    result.status = STATUS_PASS;
+    result.status = RULE_STATUS_PASS;
     snprintf(result.message, sizeof(result.message),
              "Format des titres correct");
 
     return result;
+#endif
 }

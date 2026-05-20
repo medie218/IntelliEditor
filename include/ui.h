@@ -64,6 +64,7 @@
 #define ID_EDIT_PASTE       1105
 #define ID_TOOLS_RULES_LOAD 1201
 #define ID_TOOLS_GRAMMAR    1202
+#define ID_RULES_PANEL      1301
 
 /* Messages personnalisés (WM_USER + offset) */
 #define WM_LLM_RESPONSE     (WM_USER + 100)  /**< LLM a fini une requête     */

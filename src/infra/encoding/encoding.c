@@ -6,7 +6,7 @@
  * RESPONSABLE : DEV-A
  */
 
-#include "../../include/encoding.h"
+#include "encoding.h"
 #include <windows.h>
 #include <stdlib.h>
 #include <string.h>
@@ -104,3 +104,4 @@ const char *encoding_utf8_char_at(const char *utf8, size_t index) {
     }
     return NULL;
 }
+

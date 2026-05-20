@@ -4,7 +4,7 @@
  * RESPONSABLE : DEV-A
  */
 
-#include "../../include/storage.h"
+#include "storage.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,12 @@ char *storage_read_file(const char *filepath, size_t *out_len) {
     }
 
     fseek(f, 0, SEEK_END);
-    long size = ftell(f);
+    long long size = (long long)ftell(f);
+    if (size < 0 || size > 100LL * 1024 * 1024) {
+        fclose(f);
+        fprintf(stderr, "[ERROR] Fichier trop grand ou erreur ftell\n");
+        return NULL;
+    }
     fseek(f, 0, SEEK_SET);
 
     if (size < 0) { fclose(f); return NULL; }
@@ -86,3 +91,4 @@ FileFormat storage_detect_format(const char *filepath) {
     if (_stricmp(ext, ".ie")  == 0) return FILE_FORMAT_IE;
     return FILE_FORMAT_UNKNOWN;
 }
+

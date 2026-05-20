@@ -1,170 +1,86 @@
-/**
- * @file main_window.c
- * @brief Fenêtre principale Win32 — ADAPTER / ui_win32
- *
- * =============================================================================
- * RÔLE
- * =============================================================================
- * Ce fichier contient :
- *   - WinMain() : point d'entrée de l'application Windows
- *   - WndProc() : procédure de traitement des messages Windows
- *   - Création de la fenêtre principale, des menus, de la barre de statut
- *   - Orchestration des autres composants UI (Scintilla, panneau règles)
- *
- * ARCHITECTURE IMPORTANT :
- *   WndProc reçoit les événements Windows et les traduit en appels Core.
- *   Elle ne contient PAS de logique métier.
- *
- *   Exemple de flux :
- *     [Ctrl+Z dans Scintilla]
- *          │
- *          ▼ WndProc reçoit WM_COMMAND (ID_EDIT_UNDO)
- *          │
- *          ▼ editor_undo(ctx->doc)          ← appel Core
- *          │
- *          ▼ ui_sync_text(ctx)              ← mise à jour UI
- *
- * RESPONSABLE : DEV-B
- * =============================================================================
- */
+#include "ui.h"
+#include "editor.h"
+#include "config.h"
 
-#include "../../../include/ui.h"
-#include "../../../include/editor.h"
-#include "../../../include/config.h"
 #include <commctrl.h>
+#include <stdbool.h>
+#include <windows.h>
+#include <shlobj.h>
+#include <process.h>
 #include <stdio.h>
+#include "Scintilla.h"
+#include "SciLexer.h"
 
-/* ============================================================================
- * FORWARD DECLARATIONS
- * ============================================================================ */
+// Déclaration externe pour le wrapper Scintilla
+extern bool scintilla_load(void);
+extern HWND scintilla_create(HWND parent, HINSTANCE hinstance, int x, int y, int w, int h);
+
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 static bool create_menu(HWND hwnd);
 static bool create_statusbar(AppContext *ctx);
 static bool create_toolbar(AppContext *ctx);
 
+static bool g_syncing = false;  // Flag pour éviter les boucles infinies
 
-/* ============================================================================
- * POINT D'ENTRÉE WINDOWS
- * ============================================================================ */
-
-/**
- * @brief Point d'entrée de l'application Windows.
- *
- * Initialise tout le système et lance la boucle de messages.
- *
- * TODO [DEV-B / TODO-WINMAIN-001] :
- *   1. Initialiser les contrôles communs (InitCommonControlsEx)
- *   2. Charger la config depuis %APPDATA%\IntelliEditor\config.ini
- *   3. Créer le document éditeur (editor_create)
- *   4. Initialiser l'UI (ui_init)
- *   5. Démarrer le chargement LLM dans un thread séparé
- *   6. Lancer la boucle de messages (ui_run)
- *   7. Nettoyer (ui_cleanup, editor_destroy)
- */
-int WINAPI WinMain(HINSTANCE hInstance,
-                   HINSTANCE hPrevInstance,
-                   LPSTR     lpCmdLine,
-                   int       nCmdShow) {
-    (void)hPrevInstance;
-    (void)lpCmdLine;
-
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev,
+                   LPSTR lpCmd, int nShow) {
+    (void)hPrev; (void)lpCmd;
+ 
     /* Initialiser les contrôles communs Windows */
-    INITCOMMONCONTROLSEX icc;
-    icc.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icc.dwICC  = ICC_WIN95_CLASSES | ICC_BAR_CLASSES;
+    INITCOMMONCONTROLSEX icc = {sizeof(icc), ICC_WIN95_CLASSES|ICC_BAR_CLASSES};
     InitCommonControlsEx(&icc);
-
-    /* Contexte application */
+ 
+    /* Créer le contexte application */
     AppContext ctx;
     memset(&ctx, 0, sizeof(ctx));
-    ctx.hinstance = hInstance;
-
-    /*
-     * TODO [DEV-B / TODO-WINMAIN-002] :
-     *   AppConfig cfg;
-     *   char config_path[MAX_PATH];
-     *   // Construire le chemin %APPDATA%\IntelliEditor\config.ini
-     *   SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, config_path);
-     *   strcat(config_path, "\\IntelliEditor\\config.ini");
-     *   config_load(&cfg, config_path);
-     */
-
-    /* Créer le document éditeur */
+    ctx.hinstance = hInst;
+ 
+    /* Créer le document Core */
     ctx.doc = editor_create();
     if (!ctx.doc) {
-        MessageBoxA(NULL,
-                    "Impossible de créer le document éditeur.\nMémoire insuffisante.",
-                    "IntelliEditor — Erreur fatale",
-                    MB_ICONERROR | MB_OK);
+        MessageBoxA(NULL, "Mémoire insuffisante", "Erreur", MB_ICONERROR);
         return 1;
     }
-
-    /* Initialiser l'interface graphique */
-    if (!ui_init(&ctx, hInstance, nCmdShow)) {
-        MessageBoxA(NULL,
-                    "Impossible de créer la fenêtre principale.",
-                    "IntelliEditor — Erreur fatale",
-                    MB_ICONERROR | MB_OK);
-        editor_destroy(ctx.doc);
-        return 1;
-    }
-
-    /* Lancer la boucle de messages */
-    int exit_code = ui_run(&ctx);
-
-    /* Nettoyage */
+ 
+    /* Initialiser et lancer l'UI */
+    if (!ui_init(&ctx, hInst, nShow)) return 1;
+    int code = ui_run(&ctx);
     ui_cleanup(&ctx);
     editor_destroy(ctx.doc);
-
-    return exit_code;
+    return code;
 }
 
 
-/* ============================================================================
- * INITIALISATION DE L'UI
- * ============================================================================ */
-
+  
 bool ui_init(AppContext *ctx, HINSTANCE hinstance, int ncmdshow) {
     /* Enregistrer la classe de fenêtre */
     WNDCLASSEXA wc = {0};
     wc.cbSize        = sizeof(WNDCLASSEXA);
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = hinstance;
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = UI_WINDOW_CLASS;
     wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-
-    if (!RegisterClassExA(&wc)) {
-        fprintf(stderr, "[ERROR] RegisterClassEx échoué: %lu\n", GetLastError());
-        return false;
-    }
-
+    wc.cbSize        = sizeof(WNDCLASSEXA);
+    if (!RegisterClassExA(&wc)) return false;
+ 
     /* Créer la fenêtre principale */
     ctx->hwnd_main = CreateWindowExA(
-        0,
-        UI_WINDOW_CLASS,
-        UI_WINDOW_TITLE,
+        0, UI_WINDOW_CLASS, UI_WINDOW_TITLE,
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        1200, 700,
-        NULL, NULL, hinstance, ctx   /* lpParam = ctx pour WM_CREATE */
+        CW_USEDEFAULT, CW_USEDEFAULT, 1200, 700,
+        NULL, NULL, hinstance, ctx
     );
-
-    if (!ctx->hwnd_main) {
-        fprintf(stderr, "[ERROR] CreateWindowEx échoué: %lu\n", GetLastError());
-        return false;
-    }
-
+    if (!ctx->hwnd_main) return false;
+ 
     ShowWindow(ctx->hwnd_main, ncmdshow);
     UpdateWindow(ctx->hwnd_main);
-
     return true;
 }
 
+
 int ui_run(AppContext *ctx) {
-    (void)ctx;
     MSG msg;
     while (GetMessageA(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
@@ -174,316 +90,340 @@ int ui_run(AppContext *ctx) {
 }
 
 void ui_cleanup(AppContext *ctx) {
-    /* TODO [DEV-B / TODO-UI-CLEANUP-001] : libérer ressources GDI, polices, etc. */
-    (void)ctx;
+    if (ctx->hwnd_statusbar) DestroyWindow(ctx->hwnd_statusbar);
+    if (ctx->hwnd_toolbar) DestroyWindow(ctx->hwnd_toolbar);
+    if (ctx->hwnd_rules_panel) DestroyWindow(ctx->hwnd_rules_panel);
+    if (ctx->hwnd_scintilla) DestroyWindow(ctx->hwnd_scintilla);
 }
 
+/* ------------------------------------------------------------------------- */
 
-/* ============================================================================
- * PROCÉDURE DE FENÊTRE (cœur de l'UI Win32)
- * ============================================================================ */
-
-/**
- * @brief Procédure principale de traitement des messages Windows.
- *
- * C'est ici que tous les événements UI sont traités.
- *
- * TODO [DEV-B / TODO-WNDPROC-001] :
- *   Implémenter tous les cas WM_COMMAND manquants.
- *   Implémenter WM_SIZE pour le redimensionnement des contrôles.
- *   Implémenter WM_DROPFILES pour le glisser-déposer.
- */
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    /* Récupérer le contexte depuis GWLP_USERDATA */
     AppContext *ctx = (AppContext *)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
 
     switch (msg) {
+    case WM_CREATE: {
+        CREATESTRUCTA *cs = (CREATESTRUCTA *)lp;
+        SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)cs->lpCreateParams);
+        ctx = (AppContext *)cs->lpCreateParams;
+        ctx->hwnd_main = hwnd;
 
-        case WM_CREATE: {
-            /*
-             * Stocker le contexte dans la fenêtre pour pouvoir le récupérer plus tard.
-             * lpCreateParams = le paramètre passé à CreateWindowEx.
-             */
-            CREATESTRUCTA *cs = (CREATESTRUCTA *)lp;
-            SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)cs->lpCreateParams);
+        create_menu(hwnd);
+        create_statusbar(ctx);
+        create_toolbar(ctx);
 
-            AppContext *new_ctx = (AppContext *)cs->lpCreateParams;
-            new_ctx->hwnd_main = hwnd;
+        ctx->hwnd_scintilla = scintilla_create(hwnd, ctx->hinstance, 0, 0, 800, 600);
 
-            /* Créer les menus */
-            create_menu(hwnd);
+        ctx->hwnd_rules_panel = CreateWindowExA(
+            WS_EX_CLIENTEDGE, "LISTBOX", "",
+            WS_CHILD | WS_VISIBLE | LBS_NOTIFY | WS_VSCROLL,
+            0, 0, 200, 600,
+            hwnd, (HMENU)ID_RULES_PANEL, ctx->hinstance, NULL);
 
-            /*
-             * TODO [DEV-B / TODO-WNDPROC-002] :
-             *   - create_statusbar(new_ctx)
-             *   - create_toolbar(new_ctx)
-             *   - Initialiser Scintilla (voir scintilla_wrapper.c)
-             *   - Créer le panneau de règles (voir rules_panel.c)
-             */
-
-            SetWindowTextA(hwnd, UI_WINDOW_TITLE " — Nouveau document");
-            return 0;
-        }
-
-        case WM_SIZE: {
-            /*
-             * TODO [DEV-B / TODO-WNDPROC-003] :
-             *   Redimensionner Scintilla et le panneau de règles.
-             *   Layout :
-             *     - Scintilla : toute la zone client moins UI_RULES_PANEL_W à droite
-             *     - Panneau règles : colonne droite, largeur UI_RULES_PANEL_W
-             *     - Barre de statut : en bas
-             *
-             *   RECT rc;
-             *   GetClientRect(hwnd, &rc);
-             *   int panel_w = UI_RULES_PANEL_W;
-             *   int toolbar_h = 30; // approximatif
-             *   int status_h  = 20;
-             *   MoveWindow(ctx->hwnd_scintilla, 0, toolbar_h,
-             *              rc.right - panel_w, rc.bottom - toolbar_h - status_h, TRUE);
-             *   MoveWindow(ctx->hwnd_rules_panel, rc.right - panel_w, toolbar_h,
-             *              panel_w, rc.bottom - toolbar_h - status_h, TRUE);
-             */
-            return 0;
-        }
-
-        case WM_COMMAND: {
-            int cmd_id = LOWORD(wp);
-            switch (cmd_id) {
-
-                case ID_FILE_NEW:
-                    /*
-                     * TODO [DEV-B / TODO-CMD-001] :
-                     *   Si doc->dirty, demander confirmation (MessageBox)
-                     *   Détruire l'ancien document, en créer un nouveau
-                     *   Vider Scintilla
-                     */
-                    fprintf(stderr, "[STUB] ID_FILE_NEW: TODO-CMD-001\n");
-                    break;
-
-                case ID_FILE_OPEN:
-                    /*
-                     * TODO [DEV-B / TODO-CMD-002] :
-                     *   Ouvrir une boîte de dialogue GetOpenFileName
-                     *   Lire le fichier avec storage_read_file()
-                     *   Charger dans le gap buffer avec editor_insert()
-                     *   Synchroniser Scintilla avec ui_sync_text()
-                     */
-                    fprintf(stderr, "[STUB] ID_FILE_OPEN: TODO-CMD-002\n");
-                    break;
-
-                case ID_FILE_SAVE:
-                    /*
-                     * TODO [DEV-B / TODO-CMD-003] :
-                     *   Si doc->filepath est NULL → ID_FILE_SAVE_AS
-                     *   Sinon : récupérer le texte (editor_get_text)
-                     *   Écrire avec storage_write_txt() ou selon l'extension
-                     *   doc->dirty = false
-                     *   Mettre à jour le titre de la fenêtre
-                     */
-                    fprintf(stderr, "[STUB] ID_FILE_SAVE: TODO-CMD-003\n");
-                    break;
-
-                case ID_EDIT_UNDO:
-                    if (ctx && ctx->doc) {
-                        editor_undo(ctx->doc);
-                        ui_sync_text(ctx);
-                    }
-                    break;
-
-                case ID_EDIT_REDO:
-                    if (ctx && ctx->doc) {
-                        editor_redo(ctx->doc);
-                        ui_sync_text(ctx);
-                    }
-                    break;
-
-                case ID_TOOLS_RULES_LOAD:
-                    /*
-                     * TODO [DEV-B / TODO-CMD-004] :
-                     *   Ouvrir GetOpenFileName pour fichier .json
-                     *   Appeler ruleset_load_from_file()
-                     *   Appeler rules_evaluate() sur le texte actuel
-                     *   Appeler ui_update_rules_panel()
-                     */
-                    fprintf(stderr, "[STUB] ID_TOOLS_RULES_LOAD: TODO-CMD-004\n");
-                    break;
-
-                case ID_FILE_EXIT:
-                    DestroyWindow(hwnd);
-                    break;
-            }
-            return 0;
-        }
-
-        case WM_LLM_RESPONSE: {
-            /*
-             * TODO [DEV-B / TODO-LLM-MSG-001] :
-             *   Reçu quand le thread LLM a terminé une requête.
-             *   lp = pointeur vers LlmResponse (alloué par le thread LLM)
-             *   Traiter la réponse selon son type (grammaire, reformulation, règle)
-             *   Libérer la LlmResponse
-             */
-            fprintf(stderr, "[STUB] WM_LLM_RESPONSE: TODO-LLM-MSG-001\n");
-            return 0;
-        }
-
-        case WM_RULES_RESULT: {
-            /*
-             * TODO [DEV-B / TODO-RULES-MSG-001] :
-             *   Reçu quand une évaluation de règles est terminée.
-             *   Appeler ui_update_rules_panel()
-             */
-            return 0;
-        }
-
-        case WM_CLOSE:
-            /*
-             * TODO [DEV-B / TODO-CLOSE-001] :
-             *   Vérifier doc->dirty, proposer de sauvegarder
-             */
-            DestroyWindow(hwnd);
-            return 0;
-
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
+        return 0;
     }
 
+    case WM_SIZE: {
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        int panel_w   = UI_RULES_PANEL_W;
+        int toolbar_h = 30;
+        int status_h  = 20;
+
+        MoveWindow(ctx->hwnd_scintilla, 0, toolbar_h,
+                   rc.right - panel_w,
+                   rc.bottom - toolbar_h - status_h, TRUE);
+
+        MoveWindow(ctx->hwnd_rules_panel, rc.right - panel_w, toolbar_h,
+                   panel_w,
+                   rc.bottom - toolbar_h - status_h, TRUE);
+
+        MoveWindow(ctx->hwnd_statusbar, 0, rc.bottom - status_h,
+                   rc.right, status_h, TRUE);
+        return 0;
+    }
+
+    case WM_COMMAND: {
+        switch (LOWORD(wp)) {
+        case ID_FILE_EXIT:
+            DestroyWindow(hwnd);
+            break;
+        }
+        return 0;
+    }
+
+    case WM_NOTIFY: {
+        NMHDR *nm = (NMHDR *)lp;
+        if (nm->hwndFrom == ctx->hwnd_scintilla && nm->code == SCN_MODIFIED) {
+            SCNotification *scn = (SCNotification *)lp;
+            if (!g_syncing) {
+                if (scn->modificationType & SC_MOD_INSERTTEXT) {
+                    editor_insert(ctx->doc, scn->text, scn->length);
+                } else if (scn->modificationType & SC_MOD_DELETETEXT) {
+                    editor_delete(ctx->doc, scn->position, scn->length);
+                }
+            }
+        }
+        return 0;
+    }
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
-
-/* ============================================================================
- * CRÉATION DES ÉLÉMENTS UI
- * ============================================================================ */
+/* ------------------------------------------------------------------------- */
 
 static bool create_menu(HWND hwnd) {
-    HMENU menu_bar  = CreateMenu();
-    HMENU menu_file = CreatePopupMenu();
-    HMENU menu_edit = CreatePopupMenu();
-    HMENU menu_tools= CreatePopupMenu();
-
-    /* Menu Fichier */
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_NEW,    "Nouveau\tCtrl+N");
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_OPEN,   "Ouvrir...\tCtrl+O");
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_SAVE,   "Enregistrer\tCtrl+S");
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_SAVE_AS,"Enregistrer sous...");
-    AppendMenuA(menu_file, MF_SEPARATOR, 0, NULL);
-    AppendMenuA(menu_file, MF_STRING, ID_FILE_EXIT,   "Quitter\tAlt+F4");
-
-    /* Menu Édition */
-    AppendMenuA(menu_edit, MF_STRING, ID_EDIT_UNDO,  "Annuler\tCtrl+Z");
-    AppendMenuA(menu_edit, MF_STRING, ID_EDIT_REDO,  "Rétablir\tCtrl+Y");
-    AppendMenuA(menu_edit, MF_SEPARATOR, 0, NULL);
-    AppendMenuA(menu_edit, MF_STRING, ID_EDIT_CUT,   "Couper\tCtrl+X");
-    AppendMenuA(menu_edit, MF_STRING, ID_EDIT_COPY,  "Copier\tCtrl+C");
-    AppendMenuA(menu_edit, MF_STRING, ID_EDIT_PASTE, "Coller\tCtrl+V");
-
-    /* Menu Outils */
-    AppendMenuA(menu_tools, MF_STRING, ID_TOOLS_RULES_LOAD, "Charger un fichier de règles...");
-    AppendMenuA(menu_tools, MF_STRING, ID_TOOLS_GRAMMAR,    "Vérifier la grammaire (LLM)");
-
-    AppendMenuA(menu_bar, MF_POPUP, (UINT_PTR)menu_file,  "Fichier");
-    AppendMenuA(menu_bar, MF_POPUP, (UINT_PTR)menu_edit,  "Édition");
-    AppendMenuA(menu_bar, MF_POPUP, (UINT_PTR)menu_tools, "Outils");
-
-    SetMenu(hwnd, menu_bar);
+    HMENU bar   = CreateMenu();
+    HMENU mFile = CreatePopupMenu();
+    HMENU mEdit = CreatePopupMenu();
+    HMENU mTools= CreatePopupMenu();
+    AppendMenuA(mFile, MF_STRING, ID_FILE_NEW, "Nouveau\tCtrl+N");
+    AppendMenuA(mFile, MF_STRING, ID_FILE_OPEN, "Ouvrir...\tCtrl+O");
+    AppendMenuA(mFile, MF_STRING, ID_FILE_SAVE, "Enregistrer\tCtrl+S");
+    AppendMenuA(mFile, MF_SEPARATOR, 0, NULL);
+    AppendMenuA(mFile, MF_STRING, ID_FILE_EXIT, "Quitter\tAlt+F4");
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_UNDO, "Annuler\tCtrl+Z");
+    AppendMenuA(mEdit, MF_STRING, ID_EDIT_REDO, "Rétablir\tCtrl+Y");
+    AppendMenuA(mTools,MF_STRING, ID_TOOLS_RULES_LOAD, "Charger règles...");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mFile, "Fichier");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mEdit, "Edition");
+    AppendMenuA(bar, MF_POPUP, (UINT_PTR)mTools, "Outils");
+    SetMenu(hwnd, bar);
     return true;
 }
+case WM_SIZE: {
+    if (!ctx) break;
+    RECT rc; GetClientRect(hwnd, &rc);
+    int W = rc.right; int H = rc.bottom;
+    int toolbar_h = 30; int status_h = 20;
+    int panel_w   = UI_RULES_PANEL_W;
+    int edit_w    = W - panel_w;
+    int edit_h    = H - toolbar_h - status_h;
+ 
+    /* Redimensionner Scintilla */
+    if (ctx->hwnd_scintilla)
+        MoveWindow(ctx->hwnd_scintilla, 0, toolbar_h, edit_w, edit_h, TRUE);
+ 
+    /* Redimensionner le panneau règles */
+    if (ctx->hwnd_rules_panel)
+        MoveWindow(ctx->hwnd_rules_panel, edit_w, toolbar_h, panel_w, edit_h, TRUE);
+ 
+    /* Redimensionner la barre de statut */
+    if (ctx->hwnd_statusbar)
+        SendMessageA(ctx->hwnd_statusbar, WM_SIZE, 0, 0);
+    return 0;
+}
+
 
 static bool create_statusbar(AppContext *ctx) {
-    /*
-     * TODO [DEV-B / TODO-STATUSBAR-001] :
-     *   ctx->hwnd_statusbar = CreateWindowExA(
-     *       0, STATUSCLASSNAMEA, NULL,
-     *       WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-     *       0, 0, 0, 0,
-     *       ctx->hwnd_main, NULL, ctx->hinstance, NULL);
-     *
-     *   // Définir les 4 parties de la barre de statut
-     *   int parts[4] = {200, 400, 550, -1};
-     *   SendMessage(ctx->hwnd_statusbar, SB_SETPARTS, 4, (LPARAM)parts);
-     *   SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)"Mots: 0");
-     *   SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"UTF-8");
-     *   SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)"Prêt");
-     */
-    fprintf(stderr, "[STUB] create_statusbar: TODO-STATUSBAR-001\n");
-    (void)ctx;
+    ctx->hwnd_statusbar = CreateWindowExA(
+        0, STATUSCLASSNAMEA, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0,
+        ctx->hwnd_main, NULL, ctx->hinstance, NULL);
+
+    int parts[3] = {200, 400, -1};
+    SendMessage(ctx->hwnd_statusbar, SB_SETPARTS, 3, (LPARAM)parts);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)"Mots: 0");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)"UTF-8");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"Prêt");
     return true;
 }
 
 static bool create_toolbar(AppContext *ctx) {
-    /*
-     * TODO [DEV-B / TODO-TOOLBAR-001] :
-     *   Créer une toolbar Win32 avec les boutons :
-     *   Nouveau, Ouvrir, Enregistrer | Gras, Italique, Souligné | Vérifier
-     */
-    fprintf(stderr, "[STUB] create_toolbar: TODO-TOOLBAR-001\n");
-    (void)ctx;
+    ctx->hwnd_toolbar = CreateWindowExA(
+        0, TOOLBARCLASSNAMEA, NULL,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_WRAPABLE,
+        0, 0, 0, 0,
+        ctx->hwnd_main, NULL, ctx->hinstance, NULL);
+
+    if (!ctx->hwnd_toolbar) return false;
+
+    // Envoyer TB_BUTTONSTRUCTSIZE
+    SendMessage(ctx->hwnd_toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+
+    // Définir les boutons
+    TBBUTTON tbb[] = {
+        {STD_FILENEW, ID_FILE_NEW, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Nouveau"},
+        {STD_FILEOPEN, ID_FILE_OPEN, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Ouvrir"},
+        {STD_FILESAVE, ID_FILE_SAVE, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Sauvegarder"},
+        {0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0},  // Séparateur
+        {STD_UNDO, ID_EDIT_UNDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Annuler"},
+        {STD_REDOW, ID_EDIT_REDO, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)"Rétablir"},
+    };
+
+    // Ajouter les boutons
+    SendMessage(ctx->hwnd_toolbar, TB_ADDBUTTONS, sizeof(tbb)/sizeof(TBBUTTON), (LPARAM)tbb);
+
+    // Redimensionner la barre d'outils
+    SendMessage(ctx->hwnd_toolbar, TB_AUTOSIZE, 0, 0);
+
+    return true;
+}
+case WM_COMMAND: {
+    int id = LOWORD(wp);
+    switch(id) {
+ 
+    case ID_FILE_NEW:
+        if (ctx->doc->dirty) {
+            int r = MessageBoxA(hwnd, "Sauvegarder avant de créer un nouveau document ?", "IntelliEditor", MB_YESNOCANCEL|MB_ICONQUESTION);
+            if (r == IDCANCEL) break;
+            if (r == IDYES) SendMessageA(hwnd, WM_COMMAND, ID_FILE_SAVE, 0);
+        }
+        editor_destroy(ctx->doc);
+        ctx->doc = editor_create();
+        ui_sync_text(ctx);
+        SetWindowTextA(hwnd, UI_WINDOW_TITLE " — Nouveau document");
+        break;
+ 
+    case ID_FILE_OPEN: {
+        char path[MAX_PATH] = {0};
+        OPENFILENAMEA ofn = {0};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner   = hwnd;
+        ofn.lpstrFile   = path;
+        ofn.nMaxFile    = MAX_PATH;
+        ofn.lpstrFilter = "Texte (*.txt)\0*.txt\0Tous (*.*)\0*.*\0";
+        ofn.Flags       = OFN_FILEMUSTEXIST;
+        if (GetOpenFileNameA(&ofn)) {
+            size_t len = 0;
+            char *content = storage_read_file(path, &len);
+            if (content) {
+                editor_destroy(ctx->doc);
+                ctx->doc = editor_create();
+                editor_insert(ctx->doc, content, len);
+                ctx->doc->dirty = false;
+                free(content);
+                ui_sync_text(ctx);
+            }
+        }
+        break;
+    }
+ 
+    case ID_EDIT_UNDO:
+        editor_undo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+ 
+    case ID_EDIT_REDO:
+        editor_redo(ctx->doc);
+        ui_sync_text(ctx);
+        break;
+    }
+    return 0;
+}
+static bool create_statusbar(AppContext *ctx) {
+    ctx->hwnd_statusbar = CreateWindowExA(
+        0, STATUSCLASSNAMEA, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0,
+        ctx->hwnd_main, NULL, ctx->hinstance, NULL
+    );
+    if (!ctx->hwnd_statusbar) return false;
+ 
+    int parts[4] = {200, 400, 550, -1};
+    SendMessageA(ctx->hwnd_statusbar, SB_SETPARTS, 4, (LPARAM)parts);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)"Mots: 0");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 2, (LPARAM)"UTF-8");
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 3, (LPARAM)"Prêt");
     return true;
 }
 
 
-/* ============================================================================
- * MISE À JOUR DE L'AFFICHAGE
- * ============================================================================ */
 
-void ui_sync_text(AppContext *ctx) {
-    /*
-     * TODO [DEV-B / TODO-SYNC-001] :
-     *   1. char *text = editor_get_text(ctx->doc);
-     *   2. Envoyer à Scintilla : SendMessage(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
-     *   3. free(text);
-     *   ATTENTION : ne PAS déclencher d'événement SCN_MODIFIED depuis ici
-     *   (risque de boucle infinie modifications → sync → modifications)
-     */
-    fprintf(stderr, "[STUB] ui_sync_text: TODO-SYNC-001\n");
-    (void)ctx;
-}
-
-void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
-    /*
-     * TODO [DEV-B / TODO-NLP-MARKERS-001] :
-     *   Pour chaque erreur dans result->errors[] :
-     *   - SendMessage(SCI_SETINDICATORCURRENT, ...) pour choisir l'indicateur
-     *   - SendMessage(SCI_INDICATORFILLRANGE, start, length) pour souligner
-     *
-     *   Indicateurs Scintilla suggérés :
-     *   - INDIC_SQUIGGLE (rouge) pour orthographe
-     *   - INDIC_DOTS (bleu) pour grammaire
-     *   - INDIC_BOX (orange) pour style
-     */
-    fprintf(stderr, "[STUB] ui_apply_nlp_markers: TODO-NLP-MARKERS-001\n");
-    (void)ctx;
-    (void)result;
-}
-
-void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
-    /*
-     * TODO [DEV-B / TODO-RULES-PANEL-001] :
-     *   Effacer le contenu du panneau
-     *   Pour chaque résultat dans report->results[] :
-     *   - Afficher l'icône de statut (✅ ❌ ⚠️ 🔄)
-     *   - Afficher l'ID et le message
-     *   - Rendre cliquable (clic → positionner curseur dans Scintilla)
-     *   Afficher le résumé : "Conformité: X/Y règles OK"
-     */
-    if (!ctx || !report) return;
-    fprintf(stderr, "[STUB] ui_update_rules_panel: %zu résultats, %zu OK\n",
-            report->result_count, report->pass_count);
-}
+/* ------------------------------------------------------------------------- */
 
 void ui_update_statusbar(AppContext *ctx, size_t words, int line, int col) {
-    /*
-     * TODO [DEV-B / TODO-STATUSBAR-UPDATE-001] :
-     *   char buf[64];
-     *   snprintf(buf, sizeof(buf), "Mots: %zu", words);
-     *   SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)buf);
-     *   snprintf(buf, sizeof(buf), "Ligne %d, Col %d", line, col);
-     *   SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)buf);
-     */
-    fprintf(stderr, "[STUB] ui_update_statusbar: mots=%zu, ligne=%d, col=%d\n",
-            words, line, col);
-    (void)ctx;
+    if (!ctx->hwnd_statusbar) return;
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Mots: %zu", words);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 0, (LPARAM)buf);
+    snprintf(buf, sizeof(buf), "Ligne %d, Col %d", line+1, col+1);
+    SendMessageA(ctx->hwnd_statusbar, SB_SETTEXTA, 1, (LPARAM)buf);
 }
+
+
+/* ------------------------------------------------------------------------- */
+
+void ui_sync_text(AppContext *ctx) {
+    if (!ctx->hwnd_scintilla || !ctx->doc) return;
+
+    g_syncing = true;
+    char *text = editor_get_text(ctx->doc);
+    if (!text) {
+        g_syncing = false;
+        return;
+    }
+
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETTEXT, 0, (LPARAM)text);
+    free(text);
+    g_syncing = false;
+}
+
+/* ------------------------------------------------------------------------- */
+
+void ui_apply_nlp_markers(AppContext *ctx, const NlpResult *result) {
+    if (!ctx->hwnd_scintilla || !result) return;
+
+    // Effacer tous les indicateurs
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETINDICATORCURRENT, 0, 0);
+    SendMessageA(ctx->hwnd_scintilla, SCI_INDICATORCLEARRANGE, 0, (LPARAM)SendMessageA(ctx->hwnd_scintilla, SCI_GETLENGTH, 0, 0));
+
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETINDICATORCURRENT, 1, 0);
+    SendMessageA(ctx->hwnd_scintilla, SCI_INDICATORCLEARRANGE, 0, (LPARAM)SendMessageA(ctx->hwnd_scintilla, SCI_GETLENGTH, 0, 0));
+
+    SendMessageA(ctx->hwnd_scintilla, SCI_SETINDICATORCURRENT, 2, 0);
+    SendMessageA(ctx->hwnd_scintilla, SCI_INDICATORCLEARRANGE, 0, (LPARAM)SendMessageA(ctx->hwnd_scintilla, SCI_GETLENGTH, 0, 0));
+
+    // Appliquer les nouveaux
+    for (size_t i = 0; i < result->error_count; i++) {
+        const NlpError *err = &result->errors[i];
+        int indicator = 0;  // défaut spelling
+        if (err->type == NLP_ERROR_GRAMMAR) indicator = 1;
+        else if (err->type == NLP_ERROR_STYLE) indicator = 2;
+
+        SendMessageA(ctx->hwnd_scintilla, SCI_SETINDICATORCURRENT, indicator, 0);
+        SendMessageA(ctx->hwnd_scintilla, SCI_INDICATORFILLRANGE, (WPARAM)err->position, (LPARAM)err->length);
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+
+void ui_update_rules_panel(AppContext *ctx, const RuleReport *report) {
+    if (!ctx->hwnd_rules_panel || !report) return;
+    /* Vider le panneau */
+    SendMessageA(ctx->hwnd_rules_panel, LB_RESETCONTENT, 0, 0);
+    /* Ajouter chaque résultat */
+    for (size_t i = 0; i < report->result_count; i++) {
+        char line[300];
+        const char *icon =
+            report->results[i].status == RULE_STATUS_PASS    ? "[OK] " :
+            report->results[i].status == RULE_STATUS_FAIL    ? "[KO] " :
+            report->results[i].status == RULE_STATUS_PENDING ? "[..] " : "[!!] ";
+        snprintf(line, sizeof(line), "%s%s — %s",
+                 icon,
+                 report->results[i].rule_id,
+                 report->results[i].message);
+        SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)line);
+    }
+    /* Résumé */
+    char summary[128];
+    snprintf(summary, sizeof(summary), "Conformite: %zu/%zu OK",
+             report->pass_count, report->result_count);
+    SendMessageA(ctx->hwnd_rules_panel, LB_ADDSTRING, 0, (LPARAM)summary);
+}
+case WM_LLM_RESPONSE: {
+    /* lp = pointeur vers une LlmResponse allouée par le thread LLM */
+    LlmResponse *resp = (LlmResponse *)lp;
+    if (!resp) break;
+    /* Afficher la réponse dans une boîte de dialogue */
+    MessageBoxA(hwnd, resp->text, "Réponse LLM", MB_OK|MB_ICONINFORMATION);
+    free(resp); /* Libérer la mémoire */
+    return 0;
+}
+
+   
